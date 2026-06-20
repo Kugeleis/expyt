@@ -235,6 +235,25 @@ function initEventListeners() {
         updateValueColumnsList();
     });
 
+    const selectAllBtn = document.getElementById('btn-select-all-cols');
+    const deselectAllBtn = document.getElementById('btn-deselect-all-cols');
+
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+            const checkboxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = true);
+            validateStep1Next();
+        });
+    }
+
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', () => {
+            const checkboxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            validateStep1Next();
+        });
+    }
+
     // Step 1: Upload Data
     els.btnUpload.addEventListener('click', async () => {
         const file = els.fileUpload.files[0];

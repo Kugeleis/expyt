@@ -843,3 +843,42 @@ select.form-control option {
     color: var(--text-primary);
 }
 
+.value-columns-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.value-columns-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.value-columns-actions .divider {
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 0.75rem;
+    font-weight: 550;
+    padding: 0;
+    text-decoration: underline;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.2s ease;
+}
+
+.btn-link:hover {
+    color: var(--accent-purple);
+}
+
+
