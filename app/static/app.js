@@ -8,7 +8,6 @@
 const state = {
     sessionId: null,
     currentStep: 'dataset_selection',
-    datasets: [],
     selectedDatasetId: '',
     selectedDatasetColumns: [],
     activeFilters: [],
@@ -22,7 +21,9 @@ const state = {
 // UI Elements
 const els = {
     sessionInfo: document.getElementById('session-info'),
-    datasetSelect: document.getElementById('dataset-select'),
+    fileUpload: document.getElementById('file-upload'),
+    btnUpload: document.getElementById('btn-upload'),
+    uploadStatus: document.getElementById('upload-status'),
     datasetDetails: document.getElementById('dataset-details'),
     detailDesc: document.getElementById('detail-desc'),
     groupColSelect: document.getElementById('group-col-select'),
@@ -93,10 +94,7 @@ async function startNewSession() {
         
         setSessionStatus(`Session: ${state.sessionId.substring(0, 8)}...`, 'active');
         
-        // 2. Fetch available datasets
-        await fetchDatasets();
-        
-        // 3. Move to the step indicated by session status (usually dataset_selection)
+        // 2. Move to the step indicated by session status (usually dataset_selection)
         navigateToStep(state.currentStep);
     } catch (err) {
         showError(err.message);
@@ -116,27 +114,6 @@ function setSessionStatus(text, type) {
     dotEl.style.boxShadow = 
         type === 'active' ? '0 0 8px var(--success-green)' : 
         type === 'error' ? '0 0 8px var(--error-red)' : 'none';
-}
-
-// Fetch available datasets
-async function fetchDatasets() {
-    try {
-        const response = await fetch('/wizard/datasets');
-        if (!response.ok) throw new Error('Failed to retrieve datasets catalog.');
-        
-        state.datasets = await response.json();
-        
-        // Populate dataset selector dropdown
-        els.datasetSelect.innerHTML = '<option value="">-- Select a Dataset --</option>';
-        state.datasets.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d.id;
-            opt.textContent = `${d.name} (${d.columns.length} columns)`;
-            els.datasetSelect.appendChild(opt);
-        });
-    } catch (err) {
-        showError(err.message);
-    }
 }
 
 // Navigate to a specific step panel
@@ -181,7 +158,8 @@ function initEventListeners() {
             els.btnStep1Next.disabled = true;
             els.btnStep3Next.disabled = true;
             els.btnStep5Next.disabled = true;
-            els.datasetSelect.value = '';
+            els.fileUpload.value = '';
+            els.uploadStatus.textContent = '';
             els.datasetDetails.classList.add('hidden');
             
             await startNewSession();
@@ -193,44 +171,70 @@ function initEventListeners() {
         els.errorToast.classList.add('hidden');
     });
 
-    // Step 1: Selection change
-    els.datasetSelect.addEventListener('change', (e) => {
-        const id = e.target.value;
-        state.selectedDatasetId = id;
-        
-        if (!id) {
-            els.datasetDetails.classList.add('hidden');
-            els.btnStep1Next.disabled = true;
+    // Step 1: Upload Data
+    els.btnUpload.addEventListener('click', async () => {
+        const file = els.fileUpload.files[0];
+        if (!file) {
+            showError('Please select a file to upload.');
             return;
         }
-        
-        const dataset = state.datasets.find(d => d.id === id);
-        if (!dataset) return;
-        
-        state.selectedDatasetColumns = dataset.columns;
-        els.detailDesc.textContent = dataset.description;
-        
-        // Populate group and value columns
-        els.groupColSelect.innerHTML = '';
-        els.valueColSelect.innerHTML = '';
-        els.filterCol.innerHTML = '';
-        
-        dataset.columns.forEach(col => {
-            const opt1 = document.createElement('option');
-            opt1.value = col.name;
-            opt1.textContent = `${col.name} (${col.dtype})`;
-            els.groupColSelect.appendChild(opt1);
+
+        els.uploadStatus.textContent = 'Uploading...';
+        els.uploadStatus.style.color = 'var(--text-secondary)';
+        els.btnUpload.disabled = true;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/wizard/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Upload failed.');
+            }
+
+            const dataset = await response.json();
             
-            // For values, suggest numeric columns primarily
-            const opt2 = opt1.cloneNode(true);
-            els.valueColSelect.appendChild(opt2);
+            state.selectedDatasetId = dataset.id;
+            state.selectedDatasetColumns = dataset.columns;
+            els.detailDesc.textContent = dataset.description;
             
-            const opt3 = opt1.cloneNode(true);
-            els.filterCol.appendChild(opt3);
-        });
-        
-        els.datasetDetails.classList.remove('hidden');
-        els.btnStep1Next.disabled = false;
+            // Populate group and value columns
+            els.groupColSelect.innerHTML = '';
+            els.valueColSelect.innerHTML = '';
+            els.filterCol.innerHTML = '';
+
+            dataset.columns.forEach(col => {
+                const opt1 = document.createElement('option');
+                opt1.value = col.name;
+                opt1.textContent = `${col.name} (${col.dtype})`;
+                els.groupColSelect.appendChild(opt1);
+
+                // For values, suggest numeric columns primarily
+                const opt2 = opt1.cloneNode(true);
+                els.valueColSelect.appendChild(opt2);
+
+                const opt3 = opt1.cloneNode(true);
+                els.filterCol.appendChild(opt3);
+            });
+
+            els.datasetDetails.classList.remove('hidden');
+            els.btnStep1Next.disabled = false;
+            els.uploadStatus.textContent = 'Upload successful!';
+            els.uploadStatus.style.color = 'var(--success-green)';
+        } catch (err) {
+            showError(err.message);
+            els.uploadStatus.textContent = 'Upload failed.';
+            els.uploadStatus.style.color = 'var(--error-red)';
+            els.datasetDetails.classList.add('hidden');
+            els.btnStep1Next.disabled = true;
+        } finally {
+            els.btnUpload.disabled = false;
+        }
     });
     
     // Step 1: Submit dataset

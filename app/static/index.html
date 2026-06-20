@@ -68,15 +68,16 @@
                     <p class="step-desc">Choose a dataset from the directory and map the group and value columns.</p>
                     
                     <div class="form-group">
-                        <label for="dataset-select">Available Dataset</label>
-                        <select id="dataset-select" class="form-control">
-                            <option value="">-- Loading datasets --</option>
-                        </select>
+                        <label for="file-upload">Upload Dataset (CSV, XPT, HDF5, Parquet)</label>
+                        <input type="file" id="file-upload" class="form-control" accept=".csv,.xpt,.h5,.parquet">
                     </div>
+                    <button class="btn btn-secondary btn-sm" id="btn-upload">Upload Data</button>
+
+                    <div id="upload-status" style="margin-top: 10px; font-size: 0.9em;"></div>
 
                     <div class="dataset-details hidden" id="dataset-details">
-                        <div class="details-meta">
-                            <span class="label">Description:</span>
+                        <div class="details-meta" style="margin-top: 15px;">
+                            <span class="label">Dataset:</span>
                             <span id="detail-desc" class="value"></span>
                         </div>
                         <div class="columns-grid">

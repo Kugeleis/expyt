@@ -99,6 +99,16 @@ def test_e2e_wizard_flow(e2e_server: str) -> None:
         e2e_server: The base URL of the running API server.
     """
     with httpx.Client(base_url=e2e_server) as client:
+        # Upload a dataset first
+        csv_content = (
+            b"group,value\nA,10.0\nA,10.5\nA,11.0\nA,10.2\nA,9.8\n"
+            b"B,12.0\nB,12.5\nB,13.0\nB,12.2\nB,11.8\n"
+        )
+        files = {"file": ("uploaded_data.csv", csv_content, "text/csv")}
+        resp = client.post("/wizard/upload", files=files)
+        assert resp.status_code == 200
+        assert resp.json()["id"] == "uploaded_data"
+
         # Create Session
         resp = client.post("/wizard/sessions")
         assert resp.status_code == 200
@@ -110,7 +120,7 @@ def test_e2e_wizard_flow(e2e_server: str) -> None:
         resp = client.post(
             f"/wizard/sessions/{session_id}/dataset",
             json={
-                "dataset_id": "e2e_normal_data",
+                "dataset_id": "uploaded_data",
                 "group_column": "group",
                 "value_column": "value",
             },
@@ -118,7 +128,7 @@ def test_e2e_wizard_flow(e2e_server: str) -> None:
         if resp.status_code != 200:
             print("RESPONSE BODY:", resp.json())
         assert resp.status_code == 200
-        assert resp.json()["dataset_id"] == "e2e_normal_data"
+        assert resp.json()["dataset_id"] == "uploaded_data"
 
         # Step 2: Configure filters
         resp = client.post(

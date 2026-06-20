@@ -44,12 +44,15 @@ def client(test_data_dir: Path) -> Generator[TestClient, None, None]:
 
 def test_full_wizard_flow_success(client: TestClient) -> None:
     """Verify a successful walk-through of all wizard steps."""
-    # Check datasets list endpoint
-    resp = client.get("/wizard/datasets")
+    # Upload dataset via endpoint
+    csv_content = (
+        b"group,value\nA,10.0\nA,10.5\nA,11.0\nA,10.2\nA,9.8\n"
+        b"B,12.0\nB,12.5\nB,13.0\nB,12.2\nB,11.8\n"
+    )
+    files = {"file": ("uploaded_normal_data.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
     assert resp.status_code == 200
-    datasets = resp.json()
-    assert len(datasets) == 1
-    assert datasets[0]["id"] == "normal_data"
+    assert resp.json()["id"] == "uploaded_normal_data"
 
     # Create session
     resp = client.post("/wizard/sessions")
@@ -62,13 +65,13 @@ def test_full_wizard_flow_success(client: TestClient) -> None:
     resp = client.post(
         f"/wizard/sessions/{session_id}/dataset",
         json={
-            "dataset_id": "normal_data",
+            "dataset_id": "uploaded_normal_data",
             "group_column": "group",
             "value_column": "value",
         },
     )
     assert resp.status_code == 200
-    assert resp.json()["dataset_id"] == "normal_data"
+    assert resp.json()["dataset_id"] == "uploaded_normal_data"
 
     # Step 2: Configure filters (filter out values < 5.0 - doesn't drop anything)
     resp = client.post(
@@ -161,6 +164,14 @@ def test_wizard_negative_step_guards(client: TestClient) -> None:
     assert "prerequisite" in err["detail"]
     assert "dataset_selection" in err["missing"]
 
+    # Upload dataset via endpoint first
+    csv_content = (
+        b"group,value\nA,10.0\nA,10.5\nA,11.0\nA,10.2\nA,9.8\n"
+        b"B,12.0\nB,12.5\nB,13.0\nB,12.2\nB,11.8\n"
+    )
+    files = {"file": ("normal_data.csv", csv_content, "text/csv")}
+    client.post("/wizard/upload", files=files)
+
     # Select dataset
     client.post(
         f"/wizard/sessions/{session_id}/dataset",
@@ -184,6 +195,14 @@ def test_wizard_negative_invalid_payloads(client: TestClient) -> None:
     """Invalid requests return 400 Bad Request."""
     resp = client.post("/wizard/sessions")
     session_id = resp.json()["session_id"]
+
+    # Upload dataset via endpoint first
+    csv_content = (
+        b"group,value\nA,10.0\nA,10.5\nA,11.0\nA,10.2\nA,9.8\n"
+        b"B,12.0\nB,12.5\nB,13.0\nB,12.2\nB,11.8\n"
+    )
+    files = {"file": ("normal_data.csv", csv_content, "text/csv")}
+    client.post("/wizard/upload", files=files)
 
     # Step 1: Missing column
     resp = client.post(

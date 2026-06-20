@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 
 from app.core.session import (
     InMemorySessionStore,
@@ -87,6 +88,39 @@ def list_available_datasets(
 ) -> list[DatasetInfo]:
     """Retrieve all available datasets and their metadata schemas."""
     return repo.list_datasets()
+
+
+@router.post("/upload", response_model=DatasetInfo)
+def upload_dataset(
+    file: UploadFile = File(...),
+    repo: DatasetRepository = Depends(get_dataset_repository),
+) -> DatasetInfo:
+    """Upload a dataset file."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename not provided")
+
+    # Sanitize the filename to prevent path traversal
+    safe_filename = Path(file.filename).name
+    if not safe_filename or safe_filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Access the configured data directory correctly through the repository
+    # The repository must support this attribute
+    data_dir = getattr(repo, "_data_dir", Path(os.getenv("EXPYT_DATA_DIR", "data")))
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = data_dir / safe_filename
+
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    dataset_id = file_path.stem
+
+    try:
+        return repo.get_schema(dataset_id)
+    except KeyError:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="Unsupported file format") from None
 
 
 @router.post("/sessions/{session_id}/dataset", response_model=WizardSession)
