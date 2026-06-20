@@ -1,0 +1,1 @@
+"""Filter abstract base class."""

@@ -1,0 +1,36 @@
+version: "3"
+
+tasks:
+  install:
+    desc: Install all dependencies
+    cmds:
+      - uv sync
+
+  lint:
+    desc: Run ruff linter and formatter check
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  format:
+    desc: Auto-format code with ruff
+    cmds:
+      - uv run ruff check --fix .
+      - uv run ruff format .
+
+  typecheck:
+    desc: Run mypy in strict mode
+    cmds:
+      - uv run mypy --strict app
+
+  test:
+    desc: Run tests with coverage
+    cmds:
+      - uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=90
+
+  check:
+    desc: Run all quality gates (lint, typecheck, test) — fails fast
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
