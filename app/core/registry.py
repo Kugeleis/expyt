@@ -45,7 +45,7 @@ class Registry[T]:
         """Return the human-readable label for this registry's plugin type."""
         return self._kind
 
-    def register(self, name: str) -> "type[T] | Any":
+    def register(self, name: str) -> type[T] | Any:
         """Decorator that registers a plugin class under *name*.
 
         The class is instantiated with no arguments and stored.
@@ -64,7 +64,7 @@ class Registry[T]:
             if name in self._plugins:
                 msg = f"{self._kind} plugin {name!r} is already registered"
                 raise ValueError(msg)
-            self._plugins[name] = cls()  # type: ignore[call-arg]
+            self._plugins[name] = cls()
             return cls
 
         return decorator

@@ -6,12 +6,12 @@ before the session may advance to it.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from app.core.session import WizardSession
 
 
-class WizardStep(str, Enum):
+class WizardStep(StrEnum):
     """Ordered steps in the experiment evaluation wizard."""
 
     DATASET_SELECTION = "dataset_selection"
@@ -57,7 +57,10 @@ def _completed_steps(session: WizardSession) -> set[WizardStep]:
         completed.add(WizardStep.DATASET_SELECTION)
     # Filters step is considered complete once dataset is chosen
     # (filters may be empty — that's a valid choice).
-    if session.dataset_id is not None and session.current_step != WizardStep.DATASET_SELECTION.value:
+    if (
+        session.dataset_id is not None
+        and session.current_step != WizardStep.DATASET_SELECTION.value
+    ):
         current_idx = _STEP_ORDER.index(WizardStep(session.current_step))
         filter_idx = _STEP_ORDER.index(WizardStep.FILTERS)
         if current_idx > filter_idx:
@@ -66,9 +69,13 @@ def _completed_steps(session: WizardSession) -> set[WizardStep]:
         completed.add(WizardStep.STAT_METHOD)
     if session.stat_result is not None:
         completed.add(WizardStep.RESULTS)
-    if session.current_step in {
-        WizardStep.EXPORT.value,
-    } or len(session.plot_results) > 0:
+    if (
+        session.current_step
+        in {
+            WizardStep.EXPORT.value,
+        }
+        or len(session.plot_results) > 0
+    ):
         completed.add(WizardStep.PLOT_SELECTION)
     if session.export_format is not None:
         completed.add(WizardStep.EXPORT)
@@ -94,9 +101,7 @@ class StepGuardError(Exception):
         )
 
 
-def validate_step_transition(
-    session: WizardSession, target: WizardStep
-) -> None:
+def validate_step_transition(session: WizardSession, target: WizardStep) -> None:
     """Raise ``StepGuardError`` if *session* may not advance to *target*.
 
     Args:

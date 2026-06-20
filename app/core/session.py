@@ -7,7 +7,7 @@ The ``SessionStore`` protocol abstracts storage so it can be swapped
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
@@ -27,8 +27,8 @@ class WizardSession(BaseModel):
     selected_plots: list[str] = Field(default_factory=list)
     plot_results: list[dict[str, Any]] = Field(default_factory=list)
     export_format: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class SessionStore(Protocol):
@@ -66,5 +66,5 @@ class InMemorySessionStore:
 
     def save(self, session: WizardSession) -> None:
         """Persist updates to an existing session."""
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(UTC)
         self._sessions[session.session_id] = session
