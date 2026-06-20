@@ -12,6 +12,8 @@ dependencies = [
     "matplotlib>=3.9",
     "httpx>=0.28",
     "reportlab>=4.2",
+    "pyarrow>=24.0.0",
+    "tables>=3.11.1",
 ]
 
 [dependency-groups]

@@ -13,7 +13,10 @@ from app.core.session import (
     WizardSession,
 )
 from app.datasets.models import DatasetInfo
-from app.datasets.repository import CsvDatasetRepository, DatasetRepository
+from app.datasets.repository import (
+    DatasetRepository,
+    MultiFormatDatasetRepository,
+)
 from app.exporters.base import exporter_registry
 from app.filters.base import apply_filter_pipeline
 from app.plots.base import PlotResult, plot_registry
@@ -45,7 +48,7 @@ def get_session_store() -> SessionStore:
 def get_dataset_repository() -> DatasetRepository:
     """Dependency provider for the DatasetRepository."""
     data_dir = Path(os.getenv("EXPYT_DATA_DIR", "data"))
-    return CsvDatasetRepository(data_dir)
+    return MultiFormatDatasetRepository(data_dir)
 
 
 def get_session(

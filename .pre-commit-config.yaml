@@ -15,5 +15,6 @@ repos:
           - fastapi>=0.115
           - pandas-stubs>=2.2
           - types-reportlab>=4.2
+          - pyarrow
         pass_filenames: false
         entry: mypy --strict app

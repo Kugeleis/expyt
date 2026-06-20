@@ -7,9 +7,10 @@ Concrete implementations handle the actual I/O (CSV files, databases, etc.).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from app.datasets.models import ColumnInfo, DatasetInfo
 
@@ -38,64 +39,40 @@ class DatasetRepository(Protocol):
         ...  # pragma: no cover
 
 
-class CsvDatasetRepository:
-    """Loads datasets from CSV files in a configured directory.
+@runtime_checkable
+class FileLoader(Protocol):
+    """Protocol for loaders of specific file formats."""
 
-    Each ``.csv`` file in the directory becomes a dataset.
-    The dataset ID is the file stem (filename without extension).
-    """
+    @property
+    def extension(self) -> str:
+        """Return the suffix this loader handles (e.g. '.csv')."""
+        ...  # pragma: no cover
 
-    def __init__(self, data_dir: Path) -> None:
-        """Initialize with the directory containing CSV files.
+    def load(self, path: Path) -> pd.DataFrame:
+        """Load a DataFrame from the specified file path."""
+        ...  # pragma: no cover
 
-        Args:
-            data_dir: Path to the directory with CSV files.
-        """
-        self._data_dir = data_dir
+    def get_schema(self, path: Path) -> list[ColumnInfo]:
+        """Return the column schema for the file path without reading all rows."""
+        ...  # pragma: no cover
 
-    def _csv_path(self, dataset_id: str) -> Path:
-        """Return the path for a dataset ID, raising KeyError if missing."""
-        path = self._data_dir / f"{dataset_id}.csv"
-        if not path.exists():
-            msg = f"Dataset {dataset_id!r} not found at {path}"
-            raise KeyError(msg)
-        return path
 
-    def list_datasets(self) -> list[DatasetInfo]:
-        """List all CSV datasets in the configured directory."""
-        datasets: list[DatasetInfo] = []
-        if not self._data_dir.exists():
-            return datasets
-        for csv_file in sorted(self._data_dir.glob("*.csv")):
-            datasets.append(
-                DatasetInfo(
-                    id=csv_file.stem,
-                    name=csv_file.stem.replace("_", " ").title(),
-                    description=f"CSV dataset from {csv_file.name}",
-                )
-            )
-        return datasets
+class CsvLoader:
+    """Loader for CSV files."""
 
-    def load_dataset(self, dataset_id: str) -> pd.DataFrame:
-        """Load a CSV dataset by ID.
+    @property
+    def extension(self) -> str:
+        """Return the file extension handled by this loader."""
+        return ".csv"
 
-        Raises:
-            KeyError: If the CSV file does not exist.
-        """
-        path = self._csv_path(dataset_id)
+    def load(self, path: Path) -> pd.DataFrame:
+        """Load a DataFrame from a CSV file."""
         return pd.read_csv(path)
 
-    def get_schema(self, dataset_id: str) -> DatasetInfo:
-        """Return column schema for a CSV dataset.
-
-        Loads the first 0 rows to inspect dtypes without reading the full file.
-
-        Raises:
-            KeyError: If the CSV file does not exist.
-        """
-        path = self._csv_path(dataset_id)
+    def get_schema(self, path: Path) -> list[ColumnInfo]:
+        """Read the schema of a CSV file using nrows=0."""
         df = pd.read_csv(path, nrows=0)
-        columns = [
+        return [
             ColumnInfo(
                 name=str(col),
                 dtype=str(df[col].dtype),
@@ -103,9 +80,199 @@ class CsvDatasetRepository:
             )
             for col in df.columns
         ]
+
+
+class XptLoader:
+    """Loader for SAS XPT files."""
+
+    @property
+    def extension(self) -> str:
+        """Return the file extension handled by this loader."""
+        return ".xpt"
+
+    def load(self, path: Path) -> pd.DataFrame:
+        """Load a DataFrame from a SAS XPT file, decoding bytes."""
+        df = pd.read_sas(path, format="xport")
+        # Decode byte columns
+        df.columns = pd.Index(
+            [
+                col.decode("utf-8") if isinstance(col, bytes) else str(col)
+                for col in df.columns
+            ]
+        )
+        # Decode string data values if they are bytes
+        for col in df.columns:
+            if df[col].dtype == object:
+                df[col] = df[col].apply(
+                    lambda x: x.decode("utf-8") if isinstance(x, bytes) else x
+                )
+        return df
+
+    def get_schema(self, path: Path) -> list[ColumnInfo]:
+        """Read the schema of a SAS XPT file, decoding bytes."""
+        df = self.load(path)
+        return [
+            ColumnInfo(
+                name=str(col),
+                dtype=str(df[col].dtype),
+                nullable=True,
+            )
+            for col in df.columns
+        ]
+
+
+class HdfLoader:
+    """Loader for HDF5 files."""
+
+    @property
+    def extension(self) -> str:
+        """Return the file extension handled by this loader."""
+        return ".h5"
+
+    def load(self, path: Path) -> pd.DataFrame:
+        """Load a DataFrame from an HDF5 file."""
+        with pd.HDFStore(str(path), mode="r") as store:
+            keys = store.keys()
+            if not keys:
+                msg = f"HDF5 file {path.name} contains no keys."
+                raise ValueError(msg)
+            df = store.get(keys[0])
+            if not isinstance(df, pd.DataFrame):
+                msg = f"Key {keys[0]} in HDF5 file {path.name} is not a DataFrame."
+                raise TypeError(msg)
+            return df
+
+    def get_schema(self, path: Path) -> list[ColumnInfo]:
+        """Read the schema of an HDF5 file."""
+        with pd.HDFStore(str(path), mode="r") as store:
+            keys = store.keys()
+            if not keys:
+                msg = f"HDF5 file {path.name} contains no keys."
+                raise ValueError(msg)
+            first_key = keys[0]
+            try:
+                # Try selecting 0 rows if stored in table format
+                df = store.select(first_key, start=0, stop=1)
+            except TypeError:
+                # Fallback for fixed format files
+                df = store.get(first_key)
+            if not isinstance(df, pd.DataFrame):
+                msg = f"Key {first_key} in HDF5 file {path.name} is not a DataFrame."
+                raise TypeError(msg)
+            df = df.head(1)
+        return [
+            ColumnInfo(
+                name=str(col),
+                dtype=str(df[col].dtype),
+                nullable=True,
+            )
+            for col in df.columns
+        ]
+
+
+class ParquetLoader:
+    """Loader for Parquet files."""
+
+    @property
+    def extension(self) -> str:
+        """Return the file extension handled by this loader."""
+        return ".parquet"
+
+    def load(self, path: Path) -> pd.DataFrame:
+        """Load a DataFrame from a Parquet file."""
+        return pd.read_parquet(path)
+
+    def get_schema(self, path: Path) -> list[ColumnInfo]:
+        """Read the schema of a Parquet file using pyarrow.read_schema."""
+        schema = pq.read_schema(path)  # type: ignore[no-untyped-call]
+        df = schema.empty_table().to_pandas()
+        return [
+            ColumnInfo(
+                name=str(col),
+                dtype=str(df[col].dtype),
+                nullable=True,
+            )
+            for col in df.columns
+        ]
+
+
+class MultiFormatDatasetRepository:
+    """Loads datasets from various file formats in a configured directory.
+
+    Uses registered FileLoader instances to load files of different extensions.
+    """
+
+    def __init__(self, data_dir: Path, loaders: list[FileLoader] | None = None) -> None:
+        """Initialize the repository.
+
+        Args:
+            data_dir: Path to the directory containing dataset files.
+            loaders: Optional list of file loaders. Defaults to built-in loaders.
+        """
+        self._data_dir = data_dir
+        if loaders is None:
+            loaders = [CsvLoader(), XptLoader(), HdfLoader(), ParquetLoader()]
+        self._loaders = {loader.extension.lower(): loader for loader in loaders}
+
+    def _get_loader_and_path(self, dataset_id: str) -> tuple[FileLoader, Path]:
+        """Find the file and its loader for a dataset ID.
+
+        Raises:
+            KeyError: If the dataset is not found.
+        """
+        if not self._data_dir.exists():
+            msg = f"Data directory {self._data_dir} does not exist"
+            raise KeyError(msg)
+        for path in self._data_dir.iterdir():
+            if path.is_file() and path.stem == dataset_id:
+                ext = path.suffix.lower()
+                if ext in self._loaders:
+                    return self._loaders[ext], path
+        msg = f"Dataset {dataset_id!r} not found or format not supported."
+        raise KeyError(msg)
+
+    def list_datasets(self) -> list[DatasetInfo]:
+        """List all datasets in the configured directory matching loader extensions."""
+        datasets: list[DatasetInfo] = []
+        if not self._data_dir.exists():
+            return datasets
+        added_stems: set[str] = set()
+        for path in sorted(self._data_dir.iterdir()):
+            if path.is_file() and path.suffix.lower() in self._loaders:
+                stem = path.stem
+                if stem not in added_stems:
+                    added_stems.add(stem)
+                    ext_upper = path.suffix.upper()[1:]
+                    datasets.append(
+                        DatasetInfo(
+                            id=stem,
+                            name=stem.replace("_", " ").title(),
+                            description=f"{ext_upper} dataset from {path.name}",
+                        )
+                    )
+        return datasets
+
+    def load_dataset(self, dataset_id: str) -> pd.DataFrame:
+        """Load a dataset by its ID."""
+        loader, path = self._get_loader_and_path(dataset_id)
+        return loader.load(path)
+
+    def get_schema(self, dataset_id: str) -> DatasetInfo:
+        """Return schema metadata for a dataset."""
+        loader, path = self._get_loader_and_path(dataset_id)
+        columns = loader.get_schema(path)
+        ext_upper = path.suffix.upper()[1:]
         return DatasetInfo(
             id=dataset_id,
             name=dataset_id.replace("_", " ").title(),
-            description=f"CSV dataset from {path.name}",
+            description=f"{ext_upper} dataset from {path.name}",
             columns=columns,
         )
+
+
+class CsvDatasetRepository(MultiFormatDatasetRepository):
+    """Backward-compatible repository that defaults to CSV files only."""
+
+    def __init__(self, data_dir: Path) -> None:
+        """Initialize the CSV repository."""
+        super().__init__(data_dir, loaders=[CsvLoader()])
