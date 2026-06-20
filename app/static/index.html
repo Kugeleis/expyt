@@ -71,7 +71,6 @@
                         <label for="file-upload">Upload Dataset (CSV, XPT, HDF5, Parquet)</label>
                         <input type="file" id="file-upload" class="form-control" accept=".csv,.xpt,.h5,.parquet">
                     </div>
-                    <button class="btn btn-secondary btn-sm" id="btn-upload">Upload Data</button>
 
                     <div id="upload-status" style="margin-top: 10px; font-size: 0.9em;"></div>
 
@@ -86,8 +85,15 @@
                                 <select id="group-col-select" class="form-control"></select>
                             </div>
                             <div class="form-group">
-                                <label for="value-col-select">Value Column (Dependent Variable, Numeric)</label>
-                                <select id="value-col-select" class="form-control"></select>
+                                <div class="value-columns-header">
+                                    <label>Value Columns (Dependent Variables, Numeric)</label>
+                                    <div class="value-columns-actions">
+                                        <button type="button" class="btn-link" id="btn-select-all-cols">Select All</button>
+                                        <span class="divider">/</span>
+                                        <button type="button" class="btn-link" id="btn-deselect-all-cols">Deselect All</button>
+                                    </div>
+                                </div>
+                                <div id="value-columns-list" class="value-columns-list"></div>
                             </div>
                         </div>
                     </div>

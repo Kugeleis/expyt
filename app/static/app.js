@@ -22,12 +22,11 @@ const state = {
 const els = {
     sessionInfo: document.getElementById('session-info'),
     fileUpload: document.getElementById('file-upload'),
-    btnUpload: document.getElementById('btn-upload'),
     uploadStatus: document.getElementById('upload-status'),
     datasetDetails: document.getElementById('dataset-details'),
     detailDesc: document.getElementById('detail-desc'),
     groupColSelect: document.getElementById('group-col-select'),
-    valueColSelect: document.getElementById('value-col-select'),
+    valueColumnsList: document.getElementById('value-columns-list'),
     btnStep1Next: document.getElementById('btn-step-1-next'),
     
     activeFilters: document.getElementById('active-filters'),
@@ -231,17 +230,37 @@ function initEventListeners() {
         els.errorToast.classList.add('hidden');
     });
 
-    // Step 1: Upload Data
-    els.btnUpload.addEventListener('click', async () => {
+    els.groupColSelect.addEventListener('change', () => {
+        updateValueColumnsList();
+    });
+
+    const selectAllBtn = document.getElementById('btn-select-all-cols');
+    const deselectAllBtn = document.getElementById('btn-deselect-all-cols');
+
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+            const checkboxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = true);
+            validateStep1Next();
+        });
+    }
+
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', () => {
+            const checkboxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            validateStep1Next();
+        });
+    }
+
+    // Step 1: Upload Data automatically when file is selected
+    els.fileUpload.addEventListener('change', async () => {
         const file = els.fileUpload.files[0];
-        if (!file) {
-            showError('Please select a file to upload.');
-            return;
-        }
+        if (!file) return;
 
         els.uploadStatus.textContent = 'Uploading...';
         els.uploadStatus.style.color = 'var(--text-secondary)';
-        els.btnUpload.disabled = true;
+        els.fileUpload.disabled = true;
 
         const formData = new FormData();
         formData.append('file', file);
@@ -265,7 +284,7 @@ function initEventListeners() {
             
             // Populate group and value columns
             els.groupColSelect.innerHTML = '';
-            els.valueColSelect.innerHTML = '';
+            els.valueColumnsList.innerHTML = '';
             els.filterCol.innerHTML = '';
 
             dataset.columns.forEach(col => {
@@ -274,13 +293,11 @@ function initEventListeners() {
                 opt1.textContent = `${col.name} (${col.dtype})`;
                 els.groupColSelect.appendChild(opt1);
 
-                // For values, suggest numeric columns primarily
-                const opt2 = opt1.cloneNode(true);
-                els.valueColSelect.appendChild(opt2);
-
                 const opt3 = opt1.cloneNode(true);
                 els.filterCol.appendChild(opt3);
             });
+
+            updateValueColumnsList();
 
             els.datasetDetails.classList.remove('hidden');
             els.btnStep1Next.disabled = false;
@@ -293,17 +310,20 @@ function initEventListeners() {
             els.datasetDetails.classList.add('hidden');
             els.btnStep1Next.disabled = true;
         } finally {
-            els.btnUpload.disabled = false;
+            els.fileUpload.disabled = false;
         }
     });
     
     // Step 1: Submit dataset
     els.btnStep1Next.addEventListener('click', async () => {
         try {
+            const checkedBoxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]:checked');
+            const selectedCols = Array.from(checkedBoxes).map(cb => cb.value);
+
             const payload = {
                 dataset_id: state.selectedDatasetId,
                 group_column: els.groupColSelect.value,
-                selected_value_columns: []
+                selected_value_columns: selectedCols
             };
             
             const response = await fetch(`/wizard/sessions/${state.sessionId}/dataset`, {
@@ -781,3 +801,75 @@ function showError(message) {
         els.errorToast.classList.add('hidden');
     }, 5000);
 }
+
+// Helpers for Multi-column select checklist
+function isNumericDtype(dtype) {
+    if (!dtype) return false;
+    const lower = dtype.toLowerCase();
+    return lower.startsWith('int') || lower.startsWith('uint') || lower.startsWith('float') || lower.startsWith('double') || lower === 'number';
+}
+
+function updateValueColumnsList() {
+    const selectedGroupCol = els.groupColSelect.value;
+    
+    // Remember which ones were checked before
+    const previouslyChecked = new Set();
+    const checkboxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]');
+    if (checkboxes.length > 0) {
+        checkboxes.forEach(cb => {
+            if (cb.checked) {
+                previouslyChecked.add(cb.value);
+            }
+        });
+    } else {
+        // First time populating, check all by default
+        state.selectedDatasetColumns.forEach(col => {
+            if (isNumericDtype(col.dtype) && col.name !== selectedGroupCol) {
+                previouslyChecked.add(col.name);
+            }
+        });
+    }
+
+    els.valueColumnsList.innerHTML = '';
+    
+    let hasNumeric = false;
+    state.selectedDatasetColumns.forEach(col => {
+        if (isNumericDtype(col.dtype) && col.name !== selectedGroupCol) {
+            hasNumeric = true;
+            
+            const item = document.createElement('label');
+            item.className = 'value-column-item';
+            
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = col.name;
+            cb.checked = previouslyChecked.has(col.name);
+            cb.addEventListener('change', validateStep1Next);
+            
+            const span = document.createElement('span');
+            span.textContent = `${col.name} (${col.dtype})`;
+            
+            item.appendChild(cb);
+            item.appendChild(span);
+            els.valueColumnsList.appendChild(item);
+        }
+    });
+    
+    if (!hasNumeric) {
+        els.valueColumnsList.innerHTML = '<span class="no-columns-msg" style="color: var(--text-secondary); font-size: 0.95rem;">No numeric columns available.</span>';
+    }
+    
+    validateStep1Next();
+}
+
+function validateStep1Next() {
+    const selectedGroupCol = els.groupColSelect.value;
+    const checkedBoxes = els.valueColumnsList.querySelectorAll('input[type="checkbox"]:checked');
+    
+    if (!selectedGroupCol || checkedBoxes.length === 0) {
+        els.btnStep1Next.disabled = true;
+    } else {
+        els.btnStep1Next.disabled = false;
+    }
+}
+

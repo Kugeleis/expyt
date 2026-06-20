@@ -70,8 +70,8 @@ class CsvLoader:
         return pd.read_csv(path)
 
     def get_schema(self, path: Path) -> list[ColumnInfo]:
-        """Read the schema of a CSV file using nrows=0."""
-        df = pd.read_csv(path, nrows=0)
+        """Read the schema of a CSV file using nrows=100 to infer dtypes."""
+        df = pd.read_csv(path, nrows=100)
         return [
             ColumnInfo(
                 name=str(col),

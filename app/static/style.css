@@ -798,3 +798,87 @@ select.form-control option {
 .results-table th {
     background-color: #f4f4f4;
 }
+
+/* Value Columns Checklist */
+.value-columns-list {
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.value-column-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    padding: 0.25rem 0;
+    transition: color 0.2s ease;
+}
+
+.value-column-item:hover {
+    color: var(--text-primary);
+}
+
+.value-column-item input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-purple);
+}
+
+.value-column-item span {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.value-column-item input[type="checkbox"]:checked + span {
+    color: var(--text-primary);
+}
+
+.value-columns-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.value-columns-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.value-columns-actions .divider {
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 0.75rem;
+    font-weight: 550;
+    padding: 0;
+    text-decoration: underline;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.2s ease;
+}
+
+.btn-link:hover {
+    color: var(--accent-purple);
+}
+
+
