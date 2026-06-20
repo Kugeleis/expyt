@@ -45,14 +45,14 @@ class Exporter(ABC):
     @abstractmethod
     def export(
         self,
-        stat_result: StatResult | None,
+        stat_results: list[StatResult],
         plots: list[PlotResult],
         df: pd.DataFrame,
     ) -> ExportResult:
         """Export the session results, plots, or dataset.
 
         Args:
-            stat_result: The calculated statistical test result, if any.
+            stat_results: A list of calculated statistical test results.
             plots: A list of generated plot results.
             df: The filtered dataset DataFrame.
 

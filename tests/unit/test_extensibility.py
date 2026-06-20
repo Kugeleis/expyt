@@ -124,12 +124,12 @@ class DummyExporter(Exporter):
 
     def export(
         self,
-        stat_result: StatResult | None,
+        stat_results: list[StatResult],
         plots: list[PlotResult],
         df: pd.DataFrame,
     ) -> ExportResult:
         """Export the results."""
-        summary = stat_result.summary if stat_result else "None"
+        summary = stat_results[0].summary if stat_results else "None"
         content = f"Dummy report. Stat: {summary}. Plots: {len(plots)}."
         return ExportResult(
             content=content.encode("utf-8"),
@@ -227,8 +227,8 @@ def test_custom_plugins_in_wizard_flow(client: TestClient) -> None:
     # Step 4: Execute statistical method
     resp = client.get(f"/wizard/sessions/{session_id}/results")
     assert resp.status_code == 200
-    assert resp.json()["method_name"] == "dummy_stat"
-    assert resp.json()["test_statistic"] == 100.0
+    assert resp.json()[0]["method_name"] == "dummy_stat"
+    assert resp.json()[0]["test_statistic"] == 100.0
 
     # Verify that the custom plot generator is returned as applicable
     resp = client.get(f"/wizard/sessions/{session_id}/plots")

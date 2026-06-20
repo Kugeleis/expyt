@@ -161,8 +161,8 @@ def test_e2e_wizard_flow(e2e_server: str) -> None:
         resp = client.get(f"/wizard/sessions/{session_id}/results")
         assert resp.status_code == 200
         result = resp.json()
-        assert result["method_name"] == "ttest_ind"
-        assert "p_value" in result
+        assert result[0]["method_name"] == "ttest_ind"
+        assert "p_value" in result[0]
 
         # List applicable plots
         resp = client.get(f"/wizard/sessions/{session_id}/plots")
@@ -186,5 +186,5 @@ def test_e2e_wizard_flow(e2e_server: str) -> None:
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/json"
         data = resp.json()
-        assert "statistical_result" in data
-        assert data["statistical_result"]["method_name"] == "ttest_ind"
+        assert "statistical_results" in data
+        assert data["statistical_results"][0]["method_name"] == "ttest_ind"

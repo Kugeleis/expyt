@@ -30,14 +30,14 @@ class JsonExporter(Exporter):
 
     def export(
         self,
-        stat_result: StatResult | None,
+        stat_results: list[StatResult],
         plots: list[PlotResult],
         df: pd.DataFrame,
     ) -> ExportResult:
         """Export session results and dataset to JSON format.
 
         Args:
-            stat_result: The statistical test result.
+            stat_results: The statistical test results.
             plots: The list of plot results.
             df: The dataset DataFrame.
 
@@ -46,9 +46,7 @@ class JsonExporter(Exporter):
         """
         data: dict[str, Any] = {
             "dataset": df.to_dict(orient="records"),
-            "statistical_result": (
-                stat_result.model_dump() if stat_result is not None else None
-            ),
+            "statistical_results": [r.model_dump() for r in stat_results],
             "plots": [
                 {"plot_type": p.plot_type, "image_base64": p.image_base64}
                 for p in plots

@@ -29,7 +29,7 @@ class CsvExporter(Exporter):
 
     def export(
         self,
-        stat_result: StatResult | None,
+        stat_results: list[StatResult],
         plots: list[PlotResult],
         df: pd.DataFrame,
     ) -> ExportResult:

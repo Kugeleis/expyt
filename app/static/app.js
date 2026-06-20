@@ -612,10 +612,44 @@ async function executeStatisticalMethod() {
         
         const data = await response.json();
         
-        els.resultMethodName.textContent = data.method_name;
-        els.resultStatistic.textContent = Number(data.test_statistic).toFixed(4);
-        els.resultPValue.textContent = Number(data.p_value).toFixed(6);
-        els.resultSummaryText.textContent = data.summary;
+        const container = document.getElementById('statResultsContainer');
+        container.innerHTML = '';
+
+        if (data.length === 0) {
+            container.textContent = 'No statistical results generated.';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'results-table';
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Column</th>
+                <th>Method</th>
+                <th>Statistic</th>
+                <th>p-value</th>
+                <th>Effect Size</th>
+                <th>Summary</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        data.forEach(res => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${res.column_name || ''}</td>
+                <td>${res.method_name}</td>
+                <td>${Number(res.test_statistic).toFixed(4)}</td>
+                <td>${Number(res.p_value).toFixed(6)}</td>
+                <td>${res.effect_size !== null ? Number(res.effect_size).toFixed(4) : ''}</td>
+                <td>${res.summary}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
     } catch (err) {
         showError(err.message);
     }

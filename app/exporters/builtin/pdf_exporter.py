@@ -34,14 +34,14 @@ class PdfExporter(Exporter):
 
     def export(
         self,
-        stat_result: StatResult | None,
+        stat_results: list[StatResult],
         plots: list[PlotResult],
         df: pd.DataFrame,
     ) -> ExportResult:
         """Export session results and plots to a PDF report.
 
         Args:
-            stat_result: The statistical test result.
+            stat_results: The statistical test results.
             plots: The list of plot results.
             df: The dataset DataFrame.
 
@@ -70,37 +70,35 @@ class PdfExporter(Exporter):
         story.append(Spacer(1, 15))
 
         # Statistical analysis results
-        if stat_result is not None:
+        if stat_results:
             story.append(Paragraph("Statistical Analysis Results", styles["Heading2"]))
-            story.append(
-                Paragraph(
-                    f"<b>Method:</b> {stat_result.method_name}",
-                    styles["BodyText"],
+            for res in stat_results:
+                story.append(
+                    Paragraph(f"<b>Column:</b> {res.column_name}", styles["Heading3"])
                 )
-            )
-            story.append(
-                Paragraph(
-                    f"<b>Test Statistic:</b> {stat_result.test_statistic:.4f}",
-                    styles["BodyText"],
+                story.append(
+                    Paragraph(f"<b>Method:</b> {res.method_name}", styles["BodyText"])
                 )
-            )
-            story.append(
-                Paragraph(
-                    f"<b>p-value:</b> {stat_result.p_value:.4f}",
-                    styles["BodyText"],
-                )
-            )
-            if stat_result.effect_size is not None:
                 story.append(
                     Paragraph(
-                        f"<b>Effect Size:</b> {stat_result.effect_size:.4f}",
+                        f"<b>Test Statistic:</b> {res.test_statistic:.4f}",
                         styles["BodyText"],
                     )
                 )
-            story.append(Spacer(1, 10))
-            story.append(Paragraph("<b>Summary:</b>", styles["BodyText"]))
-            story.append(Paragraph(stat_result.summary, styles["BodyText"]))
-            story.append(Spacer(1, 15))
+                story.append(
+                    Paragraph(f"<b>p-value:</b> {res.p_value:.4f}", styles["BodyText"])
+                )
+                if res.effect_size is not None:
+                    story.append(
+                        Paragraph(
+                            f"<b>Effect Size:</b> {res.effect_size:.4f}",
+                            styles["BodyText"],
+                        )
+                    )
+                story.append(Spacer(1, 10))
+                story.append(Paragraph("<b>Summary:</b>", styles["BodyText"]))
+                story.append(Paragraph(res.summary, styles["BodyText"]))
+                story.append(Spacer(1, 15))
 
         # Visualizations
         if plots:

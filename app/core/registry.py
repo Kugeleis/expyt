@@ -92,6 +92,20 @@ class Registry[T]:
         """Return a copy of all registered plugins as ``{name: instance}``."""
         return dict(self._plugins)
 
+    def get_applicable_intersect(self, properties_map: dict[str, Any]) -> dict[str, T]:
+        """Return plugins applicable across every value column property set."""
+        common: set[str] | None = None
+        for props in properties_map.values():
+            plugin_names = set(
+                self.get_applicable(
+                    **(props.model_dump() if hasattr(props, "model_dump") else props)
+                ).keys()
+            )
+            common = plugin_names if common is None else common & plugin_names
+            if not common:
+                break
+        return {name: self.get(name) for name in sorted(common or [])}
+
     def get_applicable(self, **properties: Any) -> dict[str, T]:
         """Return plugins whose ``is_applicable`` returns ``True``.
 

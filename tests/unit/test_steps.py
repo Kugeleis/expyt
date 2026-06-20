@@ -93,7 +93,7 @@ def test_plot_selection_allowed_after_results() -> None:
         dataset_id="ds1",
         current_step="plot_selection",
         selected_method="ttest",
-        stat_result={"p_value": 0.05},
+        stat_results=[{"p_value": 0.05}],
     )
     validate_step_transition(session, WizardStep.PLOT_SELECTION)
 
@@ -104,7 +104,7 @@ def test_export_allowed_after_full_flow() -> None:
         dataset_id="ds1",
         current_step="export",
         selected_method="ttest",
-        stat_result={"p_value": 0.05},
+        stat_results=[{"p_value": 0.05}],
         plot_results=[{"type": "boxplot"}],
     )
     validate_step_transition(session, WizardStep.EXPORT)
@@ -142,7 +142,7 @@ def test_reset_to_filters_clears_downstream() -> None:
         selected_value_columns=["v"],
         filters_config=[{"name": "numeric_range", "params": {"column": "v", "min": 1}}],
         selected_method="ttest",
-        stat_result={"p_value": 0.05},
+        stat_results=[{"p_value": 0.05}],
         selected_plots=["boxplot"],
         plot_results=[{"type": "boxplot"}],
         export_format="pdf",
@@ -159,7 +159,7 @@ def test_reset_to_filters_clears_downstream() -> None:
 
     # Everything after filters should be cleared
     assert session.selected_method is None
-    assert session.stat_result is None
+    assert not session.stat_results
     assert session.selected_plots == []
     assert session.plot_results == []
     assert session.export_format is None
@@ -174,7 +174,7 @@ def test_reset_to_dataset_selection_clears_all_downstream() -> None:
         selected_value_columns=["v"],
         filters_config=[{"name": "f"}],
         selected_method="ttest",
-        stat_result={"p_value": 0.05},
+        stat_results=[{"p_value": 0.05}],
         current_step="export",
     )
     reset_to_step(session, WizardStep.DATASET_SELECTION)
@@ -184,7 +184,7 @@ def test_reset_to_dataset_selection_clears_all_downstream() -> None:
     # Everything after dataset_selection is cleared
     assert session.filters_config == []
     assert session.selected_method is None
-    assert session.stat_result is None
+    assert not session.stat_results
     assert session.current_step == "dataset_selection"
 
 
@@ -196,7 +196,7 @@ def test_reset_to_stat_method_preserves_filters() -> None:
         selected_value_columns=["v"],
         filters_config=[{"name": "f"}],
         selected_method="ttest",
-        stat_result={"p_value": 0.05},
+        stat_results=[{"p_value": 0.05}],
         selected_plots=["boxplot"],
         plot_results=[{"type": "boxplot"}],
         current_step="export",
@@ -206,7 +206,7 @@ def test_reset_to_stat_method_preserves_filters() -> None:
     assert session.dataset_id == "ds1"
     assert session.filters_config == [{"name": "f"}]
     assert session.selected_method == "ttest"  # kept — it's the target step
-    assert session.stat_result is None  # cleared — after target
+    assert not session.stat_results  # cleared — after target
     assert session.selected_plots == []
     assert session.plot_results == []
     assert session.current_step == "stat_method"

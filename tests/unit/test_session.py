@@ -13,7 +13,7 @@ def test_session_defaults() -> None:
     assert session.dataset_id is None
     assert session.filters_config == []
     assert session.selected_method is None
-    assert session.stat_result is None
+    assert session.stat_results == []
     assert session.selected_plots == []
     assert session.export_format is None
 

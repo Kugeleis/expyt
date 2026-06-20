@@ -23,7 +23,7 @@ class WizardSession(BaseModel):
     selected_value_columns: list[str] = Field(default_factory=list)
     filters_config: list[dict[str, Any]] = Field(default_factory=list)
     selected_method: str | None = None
-    stat_result: dict[str, Any] | None = None
+    stat_results: list[dict[str, Any]] = Field(default_factory=list)
     selected_plots: list[str] = Field(default_factory=list)
     plot_results: list[dict[str, Any]] = Field(default_factory=list)
     top_n_columns: int = 1

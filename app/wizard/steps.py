@@ -59,7 +59,7 @@ _STEP_FIELDS: dict[WizardStep, list[str]] = {
     ],
     WizardStep.FILTERS: ["filters_config"],
     WizardStep.STAT_METHOD: ["selected_method"],
-    WizardStep.RESULTS: ["stat_result"],
+    WizardStep.RESULTS: ["stat_results"],
     WizardStep.PLOT_SELECTION: ["selected_plots", "plot_results"],
     WizardStep.EXPORT: ["export_format"],
 }
@@ -71,7 +71,7 @@ _FIELD_DEFAULTS: dict[str, object] = {
     "selected_value_columns": [],
     "filters_config": [],
     "selected_method": None,
-    "stat_result": None,
+    "stat_results": None,
     "selected_plots": [],
     "plot_results": [],
     "export_format": None,
@@ -95,7 +95,7 @@ def _completed_steps(session: WizardSession) -> set[WizardStep]:
             completed.add(WizardStep.FILTERS)
     if session.selected_method is not None:
         completed.add(WizardStep.STAT_METHOD)
-    if session.stat_result is not None:
+    if session.stat_results:
         completed.add(WizardStep.RESULTS)
     if (
         session.current_step
