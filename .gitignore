@@ -37,5 +37,6 @@ coverage.xml
 .pytest_cache/
 
 # Test data
-test_data/
+test_data/*
+!test_data/nycflights.csv
 data/
