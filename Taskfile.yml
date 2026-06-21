@@ -40,8 +40,26 @@ tasks:
     cmds:
       - uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
+  docs:generate:
+    desc: Generate OpenAPI JSON schema and interactive ReDoc documentation
+    cmds:
+      - uv run python scripts/generate_openapi.py
+
+  docs:build:
+    desc: Build static documentation pages
+    deps: [docs:generate]
+    cmds:
+      - uv run mkdocs build
+
+  docs:serve:
+    desc: Serve the documentation site locally with live reload
+    deps: [docs:generate]
+    cmds:
+      - uv run mkdocs serve --dev-addr 127.0.0.1:8001
+
   bump:
     desc: Bump application version using bump-my-version (e.g. task bump -- patch)
     cmds:
       - uv run bump-my-version bump {{.CLI_ARGS}}
+
 

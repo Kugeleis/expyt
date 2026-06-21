@@ -28,6 +28,8 @@ dev = [
     "types-reportlab>=4.2",
     "pre-commit>=4.2",
     "bump-my-version>=1.4.1",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
 ]
 
 [tool.ruff]

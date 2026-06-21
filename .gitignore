@@ -40,3 +40,8 @@ coverage.xml
 test_data/*
 !test_data/nycflights.csv
 data/
+
+# Generated documentation
+site/
+docs/api/
+
