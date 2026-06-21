@@ -497,6 +497,15 @@ label {
     margin-top: 10px;
 }
 
+.results-table th {
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.results-table th:hover {
+    background-color: rgba(16, 185, 129, 0.08);
+    color: var(--pico-primary);
+}
+
 /* Step 5: Visualizations */
 .plots-layout {
     display: grid;

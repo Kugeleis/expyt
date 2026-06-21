@@ -3,7 +3,6 @@
  * 
  * Handles step transitions, state management, and backend communication.
  */
-
 // Global State
 const state = {
     sessionId: null,
@@ -18,7 +17,11 @@ const state = {
     selectedMethod: '',
     applicablePlots: [],
     selectedPlots: [],
-    selectedExportFormat: 'pdf'
+    selectedExportFormat: 'pdf',
+    statResults: [],
+    plotsTopN: 1,
+    sortColumn: null,
+    sortAsc: true
 };
 
 // UI Elements
@@ -35,7 +38,6 @@ const els = {
     subgroupsSearch: document.getElementById('subgroups-search'),
     subgroupsList: document.getElementById('subgroups-list'),
     btnStep1Next: document.getElementById('btn-step-1-next'),
-
     
     activeFilters: document.getElementById('active-filters'),
     filterType: document.getElementById('filter-type'),
@@ -56,6 +58,8 @@ const els = {
     resultStatistic: document.getElementById('result-statistic'),
     resultPValue: document.getElementById('result-p-value'),
     resultSummaryText: document.getElementById('result-summary-text'),
+    plotsSigFilter: document.getElementById('plots-sig-filter'),
+    filteredPlotsCounter: document.getElementById('filtered-plots-counter'),
     btnStep4Next: document.getElementById('btn-step-4-next'),
     
     plotsSelector: document.getElementById('plots-selector'),
@@ -555,7 +559,7 @@ function initEventListeners() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     selected_plots: state.selectedPlots,
-                    top_n_columns: state.selectedValueColumns.size
+                    top_n_columns: state.plotsTopN
                 })
             });
             
@@ -627,6 +631,13 @@ function initEventListeners() {
             showError(err.message);
         }
     });
+
+    // Step 4: Significance filter change
+    if (els.plotsSigFilter) {
+        els.plotsSigFilter.addEventListener('input', () => {
+            updatePlotsFilter();
+        });
+    }
 
     // Back buttons
     els.btnStep2Back.addEventListener('click', () => goToStep('dataset_selection'));
@@ -728,52 +739,155 @@ async function executeStatisticalMethod() {
         if (!response.ok) throw new Error('Statistical evaluation run failed.');
         
         const data = await response.json();
+        state.statResults = data;
         
-        const container = document.getElementById('statResultsContainer');
-        container.innerHTML = '';
-
-        if (data.length === 0) {
-            container.textContent = 'No statistical results generated.';
-            return;
-        }
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'overflow-auto';
-
-        const table = document.createElement('table');
-        table.className = 'results-table striped';
-        const thead = document.createElement('thead');
-        thead.innerHTML = `
-            <tr>
-                <th scope="col">Column</th>
-                <th scope="col">Method</th>
-                <th scope="col">Statistic</th>
-                <th scope="col">p-value</th>
-                <th scope="col">Effect Size</th>
-                <th scope="col">Summary</th>
-            </tr>
-        `;
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-        data.forEach(res => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${res.column_name || ''}</td>
-                <td>${res.method_name}</td>
-                <td>${Number(res.test_statistic).toFixed(4)}</td>
-                <td>${Number(res.p_value).toFixed(6)}</td>
-                <td>${res.effect_size !== null ? Number(res.effect_size).toFixed(4) : ''}</td>
-                <td>${res.summary}</td>
-            `;
-            tbody.appendChild(tr);
+        // Default sort: p-value asc
+        state.sortColumn = 'p_value';
+        state.sortAsc = true;
+        
+        // Sort initial data
+        state.statResults.sort((a, b) => {
+            if (a.p_value === null || a.p_value === undefined) return 1;
+            if (b.p_value === null || b.p_value === undefined) return -1;
+            return a.p_value - b.p_value;
         });
-        table.appendChild(tbody);
-        wrapper.appendChild(table);
-        container.appendChild(wrapper);
+        
+        // Update significance filter count & state.plotsTopN
+        updatePlotsFilter();
+        
+        // Render
+        renderResultsTable();
     } catch (err) {
         showError(err.message);
     }
+}
+
+// Client-side sorting for Step 4 statistical results
+function sortResults(field) {
+    if (state.sortColumn === field) {
+        state.sortAsc = !state.sortAsc;
+    } else {
+        state.sortColumn = field;
+        state.sortAsc = true;
+    }
+    
+    state.statResults.sort((a, b) => {
+        let valA = a[field];
+        let valB = b[field];
+        
+        // Keep null/undefined values always at the bottom of the table
+        if (valA === null || valA === undefined) {
+            if (valB === null || valB === undefined) return 0;
+            return 1;
+        }
+        if (valB === null || valB === undefined) {
+            return -1;
+        }
+        
+        if (typeof valA === 'number' && typeof valB === 'number') {
+            return state.sortAsc ? valA - valB : valB - valA;
+        } else {
+            // String comparison
+            const strA = String(valA).toLowerCase();
+            const strB = String(valB).toLowerCase();
+            if (strA < strB) return state.sortAsc ? -1 : 1;
+            if (strA > strB) return state.sortAsc ? 1 : -1;
+            return 0;
+        }
+    });
+    
+    renderResultsTable();
+}
+
+// Render the results table
+function renderResultsTable() {
+    const container = document.getElementById('statResultsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!state.statResults || state.statResults.length === 0) {
+        container.textContent = 'No statistical results generated.';
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'overflow-auto';
+
+    const table = document.createElement('table');
+    table.className = 'results-table striped';
+    
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+    
+    const headers = [
+        { label: 'Column', field: 'column_name' },
+        { label: 'Method', field: 'method_name' },
+        { label: 'Statistic', field: 'test_statistic' },
+        { label: 'p-value', field: 'p_value' },
+        { label: 'Effect Size', field: 'effect_size' }
+    ];
+    
+    headers.forEach(h => {
+        const th = document.createElement('th');
+        th.setAttribute('scope', 'col');
+        th.style.cursor = 'pointer';
+        th.style.userSelect = 'none';
+        th.dataset.field = h.field;
+        
+        let indicator = '';
+        if (state.sortColumn === h.field) {
+            indicator = state.sortAsc ? ' ▲' : ' ▼';
+        }
+        th.textContent = h.label + indicator;
+        
+        th.addEventListener('click', () => {
+            sortResults(h.field);
+        });
+        
+        tr.appendChild(th);
+    });
+    
+    thead.appendChild(tr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    state.statResults.forEach(res => {
+        const trRow = document.createElement('tr');
+        trRow.innerHTML = `
+            <td>${res.column_name || ''}</td>
+            <td>${res.method_name}</td>
+            <td>${res.test_statistic !== null && res.test_statistic !== undefined ? Number(res.test_statistic).toFixed(4) : ''}</td>
+            <td>${res.p_value !== null && res.p_value !== undefined ? Number(res.p_value).toFixed(6) : ''}</td>
+            <td>${res.effect_size !== null && res.effect_size !== undefined ? Number(res.effect_size).toFixed(4) : ''}</td>
+        `;
+        tbody.appendChild(trRow);
+    });
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+    container.appendChild(wrapper);
+}
+
+// Calculate the number of variables with p-value <= significance threshold
+function updatePlotsFilter() {
+    const filterInput = els.plotsSigFilter;
+    if (!filterInput) return;
+    
+    let threshold = parseFloat(filterInput.value);
+    if (isNaN(threshold) || threshold < 0) {
+        threshold = 0.05;
+    }
+    
+    const matchingResults = state.statResults.filter(res => res.p_value !== null && res.p_value !== undefined && res.p_value <= threshold);
+    const count = matchingResults.length;
+    
+    state.plotsTopN = count;
+    
+    if (els.filteredPlotsCounter) {
+        els.filteredPlotsCounter.textContent = `Matches ${count} variable${count !== 1 ? 's' : ''}`;
+    }
+    
+    // Update step 5 plots count if needed
+    updatePlotsCounter();
 }
 
 // Fetch applicable plots list
@@ -875,7 +989,7 @@ async function generatePlotsPreview() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 selected_plots: state.selectedPlots,
-                top_n_columns: state.selectedValueColumns.size
+                top_n_columns: state.plotsTopN
             })
         });
         
@@ -958,7 +1072,7 @@ async function generatePlotsPreview() {
 }
 
 function updatePlotsCounter() {
-    const numVariables = state.selectedValueColumns.size;
+    const numVariables = state.plotsTopN;
     const numPlots = state.selectedPlots.length;
     const totalPlots = numVariables * numPlots;
     
