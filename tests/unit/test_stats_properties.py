@@ -1,11 +1,12 @@
-"""Unit tests for the statistical methods and data properties computation."""
+"""Unit tests for the statistical data properties computation and helpers."""
 
 from __future__ import annotations
+
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import pytest
-import scipy.stats as stats
 
 from app.stats.base import (
     DataProperties,
@@ -17,12 +18,7 @@ from app.stats.base import (
     compute_sphericity,
     compute_variance_homogeneity,
     guess_outcome_type,
-    stat_registry,
 )
-from app.stats.builtin.anova import Anova
-from app.stats.builtin.kruskal_wallis import KruskalWallis
-from app.stats.builtin.mann_whitney import MannWhitney
-from app.stats.builtin.ttest import TTestInd
 
 
 @pytest.fixture
@@ -38,30 +34,6 @@ def normal_groups_df() -> pd.DataFrame:
         }
     )
     return df
-
-
-@pytest.fixture
-def three_groups_df() -> pd.DataFrame:
-    """Return a DataFrame with three normally distributed groups."""
-    np.random.seed(42)
-    g1 = np.random.normal(loc=10.0, scale=1.0, size=15)
-    g2 = np.random.normal(loc=11.0, scale=1.0, size=15)
-    g3 = np.random.normal(loc=12.0, scale=1.0, size=15)
-    df = pd.DataFrame(
-        {
-            "group": ["A"] * 15 + ["B"] * 15 + ["C"] * 15,
-            "value": np.concatenate([g1, g2, g3]),
-        }
-    )
-    return df
-
-
-def test_registrations() -> None:
-    """Verify built-in statistical methods are registered."""
-    assert isinstance(stat_registry.get("ttest_ind"), TTestInd)
-    assert isinstance(stat_registry.get("mann_whitney"), MannWhitney)
-    assert isinstance(stat_registry.get("anova"), Anova)
-    assert isinstance(stat_registry.get("kruskal_wallis"), KruskalWallis)
 
 
 def test_compute_data_properties_valid(normal_groups_df: pd.DataFrame) -> None:
@@ -219,265 +191,6 @@ def test_data_properties_sampling() -> None:
     assert total_n_normality == 50000
 
 
-def test_ttest_applicability() -> None:
-    """Test ttest_ind applicability rules."""
-    ttest = TTestInd()
-
-    # Applicable: 2 normal groups, size >= 2
-    props_valid = DataProperties(
-        n_groups=2,
-        group_sizes={"A": 10, "B": 10},
-        normality={"A": 0.5, "B": 0.6},
-        variance_homogeneity=0.8,
-    )
-    assert ttest.is_applicable(**props_valid.model_dump()) is True
-
-    # Inapplicable: 3 groups
-    props_three_groups = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 10, "B": 10, "C": 10},
-        normality={"A": 0.5, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.8,
-    )
-    assert ttest.is_applicable(**props_three_groups.model_dump()) is False
-
-    # Inapplicable: Small group size (< 2)
-    props_small = DataProperties(
-        n_groups=2,
-        group_sizes={"A": 1, "B": 10},
-        normality={"A": 0.5, "B": 0.6},
-        variance_homogeneity=0.8,
-    )
-    assert ttest.is_applicable(**props_small.model_dump()) is False
-
-    # Inapplicable: Non-normal group
-    props_non_normal = DataProperties(
-        n_groups=2,
-        group_sizes={"A": 10, "B": 10},
-        normality={"A": 0.01, "B": 0.6},
-        variance_homogeneity=0.8,
-    )
-    assert ttest.is_applicable(**props_non_normal.model_dump()) is False
-
-
-def test_ttest_run(normal_groups_df: pd.DataFrame) -> None:
-    """Test running ttest_ind against scipy reference."""
-    ttest = TTestInd()
-    gA = normal_groups_df[normal_groups_df["group"] == "A"]["value"].tolist()
-    gB = normal_groups_df[normal_groups_df["group"] == "B"]["value"].tolist()
-
-    res = ttest.run({"A": gA, "B": gB})
-    ref_stat, ref_p = stats.ttest_ind(gA, gB, equal_var=True)
-
-    assert res.method_name == "ttest_ind"
-    assert pytest.approx(res.test_statistic) == ref_stat
-    assert pytest.approx(res.p_value) == ref_p
-    assert res.effect_size is not None
-    assert res.effect_size < 0  # Group A mean is lower than B in the seed
-
-
-def test_ttest_run_errors() -> None:
-    """Test ttest_ind run error states."""
-    ttest = TTestInd()
-    with pytest.raises(ValueError, match="requires exactly 2 groups"):
-        ttest.run({"A": [1.0, 2.0]})
-
-    with pytest.raises(ValueError, match="at least 2 samples"):
-        ttest.run({"A": [1.0], "B": [1.0, 2.0]})
-
-
-def test_mann_whitney_applicability() -> None:
-    """Test mann_whitney applicability rules."""
-    mw = MannWhitney()
-
-    # Applicable: 2 groups, size >= 2, normality doesn't matter
-    props_valid = DataProperties(
-        n_groups=2,
-        group_sizes={"A": 10, "B": 10},
-        normality={"A": 0.01, "B": 0.02},
-        variance_homogeneity=0.8,
-    )
-    assert mw.is_applicable(**props_valid.model_dump()) is True
-
-    # Inapplicable: 3 groups
-    props_three_groups = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 10, "B": 10, "C": 10},
-        normality={"A": 0.5, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.8,
-    )
-    assert mw.is_applicable(**props_three_groups.model_dump()) is False
-
-    # Inapplicable: Small group size
-    props_small = DataProperties(
-        n_groups=2,
-        group_sizes={"A": 1, "B": 10},
-        normality={"A": 0.5, "B": 0.6},
-        variance_homogeneity=0.8,
-    )
-    assert mw.is_applicable(**props_small.model_dump()) is False
-
-
-def test_mann_whitney_run(normal_groups_df: pd.DataFrame) -> None:
-    """Test running mann_whitney against scipy reference."""
-    mw = MannWhitney()
-    gA = normal_groups_df[normal_groups_df["group"] == "A"]["value"].tolist()
-    gB = normal_groups_df[normal_groups_df["group"] == "B"]["value"].tolist()
-
-    res = mw.run({"A": gA, "B": gB})
-    ref_stat, ref_p = stats.mannwhitneyu(gA, gB, alternative="two-sided")
-
-    assert res.method_name == "mann_whitney"
-    assert pytest.approx(res.test_statistic) == ref_stat
-    assert pytest.approx(res.p_value) == ref_p
-    assert res.effect_size is not None
-
-
-def test_mann_whitney_run_errors() -> None:
-    """Test mann_whitney run error states."""
-    mw = MannWhitney()
-    with pytest.raises(ValueError, match="requires exactly 2 groups"):
-        mw.run({"A": [1.0, 2.0]})
-
-    with pytest.raises(ValueError, match="at least 2 samples"):
-        mw.run({"A": [1.0], "B": [1.0, 2.0]})
-
-
-def test_anova_applicability() -> None:
-    """Test anova applicability rules."""
-    anova = Anova()
-
-    # Applicable: >= 2 groups, size >= 2, normal, homogeneous
-    props_valid = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 10, "B": 10, "C": 10},
-        normality={"A": 0.5, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.8,
-    )
-    assert anova.is_applicable(**props_valid.model_dump()) is True
-
-    # Inapplicable: < 2 groups
-    props_one_group = DataProperties(
-        n_groups=1,
-        group_sizes={"A": 10},
-        normality={"A": 0.5},
-        variance_homogeneity=1.0,
-    )
-    assert anova.is_applicable(**props_one_group.model_dump()) is False
-
-    # Inapplicable: Small group size
-    props_small = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 1, "B": 10, "C": 10},
-        normality={"A": 0.5, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.8,
-    )
-    assert anova.is_applicable(**props_small.model_dump()) is False
-
-    # Inapplicable: Non-normal
-    props_non_normal = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 10, "B": 10, "C": 10},
-        normality={"A": 0.01, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.8,
-    )
-    assert anova.is_applicable(**props_non_normal.model_dump()) is False
-
-    # Inapplicable: Heterogeneous variance
-    props_hetero = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 10, "B": 10, "C": 10},
-        normality={"A": 0.5, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.02,
-    )
-    assert anova.is_applicable(**props_hetero.model_dump()) is False
-
-
-def test_anova_run(three_groups_df: pd.DataFrame) -> None:
-    """Test running anova against scipy reference."""
-    anova = Anova()
-    gA = three_groups_df[three_groups_df["group"] == "A"]["value"].tolist()
-    gB = three_groups_df[three_groups_df["group"] == "B"]["value"].tolist()
-    gC = three_groups_df[three_groups_df["group"] == "C"]["value"].tolist()
-
-    res = anova.run({"A": gA, "B": gB, "C": gC})
-    ref_stat, ref_p = stats.f_oneway(gA, gB, gC)
-
-    assert res.method_name == "anova"
-    assert pytest.approx(res.test_statistic) == ref_stat
-    assert pytest.approx(res.p_value) == ref_p
-    assert res.effect_size is not None
-    assert 0.0 <= res.effect_size <= 1.0
-
-
-def test_anova_run_errors() -> None:
-    """Test anova run error states."""
-    anova = Anova()
-    with pytest.raises(ValueError, match="requires at least 2 groups"):
-        anova.run({"A": [1.0, 2.0]})
-
-    with pytest.raises(ValueError, match="at least 2 samples"):
-        anova.run({"A": [1.0], "B": [1.0, 2.0]})
-
-
-def test_kruskal_wallis_applicability() -> None:
-    """Test kruskal_wallis applicability rules."""
-    kw = KruskalWallis()
-
-    # Applicable: >= 2 groups, size >= 2
-    props_valid = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 10, "B": 10, "C": 10},
-        normality={"A": 0.01, "B": 0.02, "C": 0.03},
-        variance_homogeneity=0.01,
-    )
-    assert kw.is_applicable(**props_valid.model_dump()) is True
-
-    # Inapplicable: < 2 groups
-    props_one_group = DataProperties(
-        n_groups=1,
-        group_sizes={"A": 10},
-        normality={"A": 0.5},
-        variance_homogeneity=1.0,
-    )
-    assert kw.is_applicable(**props_one_group.model_dump()) is False
-
-    # Inapplicable: Small group size
-    props_small = DataProperties(
-        n_groups=3,
-        group_sizes={"A": 1, "B": 10, "C": 10},
-        normality={"A": 0.5, "B": 0.6, "C": 0.7},
-        variance_homogeneity=0.8,
-    )
-    assert kw.is_applicable(**props_small.model_dump()) is False
-
-
-def test_kruskal_wallis_run(three_groups_df: pd.DataFrame) -> None:
-    """Test running kruskal_wallis against scipy reference."""
-    kw = KruskalWallis()
-    gA = three_groups_df[three_groups_df["group"] == "A"]["value"].tolist()
-    gB = three_groups_df[three_groups_df["group"] == "B"]["value"].tolist()
-    gC = three_groups_df[three_groups_df["group"] == "C"]["value"].tolist()
-
-    res = kw.run({"A": gA, "B": gB, "C": gC})
-    ref_stat, ref_p = stats.kruskal(gA, gB, gC)
-
-    assert res.method_name == "kruskal_wallis"
-    assert pytest.approx(res.test_statistic) == ref_stat
-    assert pytest.approx(res.p_value) == ref_p
-    assert res.effect_size is not None
-
-
-def test_kruskal_wallis_run_errors() -> None:
-    """Test kruskal_wallis run error states."""
-    kw = KruskalWallis()
-    with pytest.raises(ValueError, match="requires at least 2 groups"):
-        kw.run({"A": [1.0, 2.0]})
-
-    with pytest.raises(ValueError, match="at least 2 samples"):
-        kw.run({"A": [1.0], "B": [1.0, 2.0]})
-
-
 def test_stats_edge_cases_and_fallbacks() -> None:
     """Test all statistical utility edge cases and fallback paths for coverage."""
     # 1. compute_variance_homogeneity with group size < 2
@@ -554,3 +267,105 @@ def test_stats_edge_cases_and_fallbacks() -> None:
     assert props_old.outcome_type_guess == "continuous"
     assert props_old.all_groups_normal is True
     assert props_old.missing.outcome_missing.count == 0
+
+
+def test_stats_properties_extra_edge_cases() -> None:
+    """Test further statistical edge cases to maximize code coverage."""
+    # 1. convert_old_format with non-dict input
+    assert DataProperties.convert_old_format([1, 2, 3]) == [1, 2, 3]
+
+    # 2. _convert_old_normality with non-dict normality
+    from app.stats.base import _convert_old_normality
+
+    data = {"normality": "not-a-dict"}
+    _convert_old_normality(data)
+    assert data["normality"] == "not-a-dict"
+
+    # 3. _get_all_groups_normal fallback cases
+    from app.stats.base import _get_all_groups_normal
+
+    assert _get_all_groups_normal("not-a-dict") is False
+    assert _get_all_groups_normal({"A": {"is_normal": False}}) is False
+
+    # Custom class for testing hasattr(v, "is_normal")
+    class DummyNormalObj:
+        def __init__(self, is_normal: bool):
+            self.is_normal = is_normal
+
+    assert _get_all_groups_normal({"A": DummyNormalObj(True)}) is True
+    assert _get_all_groups_normal({"A": DummyNormalObj(False)}) is False
+    assert _get_all_groups_normal({"A": "invalid-value"}) is False
+
+    # 4. guess_outcome_type empty series and exceptions
+    empty_series = pd.Series([], dtype=float)
+    assert guess_outcome_type(empty_series) == "categorical_nominal"
+
+    # Exception in is_integer guess_outcome_type
+    with patch("pandas.api.types.is_numeric_dtype", return_value=True):
+        bad_series = pd.Series(["abc", "def"])
+        assert guess_outcome_type(bad_series) == "categorical_nominal"
+
+    # 5. compute_normality Shapiro-Wilk and D'Agostino-Pearson failures
+    with patch("scipy.stats.shapiro", side_effect=ValueError("Mock shapiro error")):
+        df_shapiro = pd.DataFrame({"group": ["A"] * 5, "value": [1.0, 2.0, 3.0, 4.0, 5.0]})
+        from app.stats.base import compute_normality
+
+        res_sh = compute_normality(df_shapiro, "value", "group")
+        assert "Shapiro-Wilk failed" in (res_sh["A"].note or "")
+        assert res_sh["A"].p_value is None
+
+    with patch("scipy.stats.normaltest", side_effect=ValueError("Mock normaltest error")):
+        df_dp = pd.DataFrame({"group": ["A"] * 5001, "value": [1.0] * 5001})
+        res_dp = compute_normality(df_dp, "value", "group")
+        assert "D'Agostino-Pearson failed" in (res_dp["A"].note or "")
+        assert res_dp["A"].p_value is None
+
+    # 6. stats.levene returning NaN p-value
+    with patch("scipy.stats.levene", return_value=(0.0, np.nan)):
+        df_levene_nan = pd.DataFrame({"group": ["A"] * 5 + ["B"] * 5, "value": [1.0] * 10})
+        res_lev_nan = compute_variance_homogeneity(df_levene_nan, "value", "group")
+        assert res_lev_nan is not None
+        assert res_lev_nan.equal_variances is False
+
+    # stats.levene raising exception
+    with patch("scipy.stats.levene", side_effect=RuntimeError("Mock Levene Error")):
+        df_levene_err = pd.DataFrame({"group": ["A"] * 5 + ["B"] * 5, "value": [1.0] * 10})
+        res_lev_err = compute_variance_homogeneity(df_levene_err, "value", "group")
+        assert res_lev_err is not None
+        assert res_lev_err.equal_variances is False
+
+    # 7. chi2_contingency raising exception in compute_expected_cell_counts
+    with patch("scipy.stats.chi2_contingency", side_effect=ValueError("Mock chi2 error")):
+        df_chi = pd.DataFrame({"group": ["A"] * 5 + ["B"] * 5, "outcome": ["X"] * 10})
+        expected, min_val = compute_expected_cell_counts(df_chi, "outcome", "group")
+        assert expected is not None
+
+    # 8. sphericity linalg exceptions and trace <= 0
+    with patch("numpy.linalg.qr", side_effect=Exception("Mock QR Error")):
+        df_spher_err = pd.DataFrame({"group": ["T1"] * 5 + ["T2"] * 5 + ["T3"] * 5, "value": [1.0] * 15})
+        res_spher_err = compute_sphericity(df_spher_err, "value", "group", repeated_measures=True, n_conditions=3)
+        assert res_spher_err is not None
+        assert "Error constructing contrast matrix" in res_spher_err.note
+
+    with patch("numpy.linalg.det", side_effect=Exception("Mock Det Error")):
+        df_spher_err2 = pd.DataFrame({"group": ["T1"] * 5 + ["T2"] * 5 + ["T3"] * 5, "value": [1.0] * 15})
+        res_spher_err2 = compute_sphericity(df_spher_err2, "value", "group", repeated_measures=True, n_conditions=3)
+        assert res_spher_err2 is not None
+        assert "Error computing transformed covariance matrix" in res_spher_err2.note
+
+    with patch("numpy.trace", return_value=0.0):
+        df_spher_trace = pd.DataFrame({"group": ["T1"] * 5 + ["T2"] * 5 + ["T3"] * 5, "value": [1.0] * 15})
+        res_spher_trace = compute_sphericity(df_spher_trace, "value", "group", repeated_measures=True, n_conditions=3)
+        assert res_spher_trace is not None
+        assert "Zero trace" in res_spher_trace.note
+
+    # 9. compute_missing_summary chi2_contingency failure
+    with patch("scipy.stats.chi2_contingency", side_effect=ValueError("Mock contingency error")):
+        df_miss_err = pd.DataFrame(
+            {
+                "group": ["A", "A", "B", "B"],
+                "outcome": [1.0, None, 3.0, None],
+            }
+        )
+        summary_err = compute_missing_summary(df_miss_err, "outcome", "group")
+        assert "Association test failed" in (summary_err.association.note or "")
