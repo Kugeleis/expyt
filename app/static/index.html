@@ -28,6 +28,15 @@
                 <span class="dot"></span>
                 <span class="text">Initializing session...</span>
             </div>
+            <div class="sidebar-actions" style="display: flex; gap: 0.5rem; justify-content: space-between;">
+                <button class="secondary outline" id="btn-sidebar-back" style="flex: 1; display: none;" title="Go Back">
+                    &larr;
+                </button>
+                <button id="btn-sidebar-next" style="flex: 1;" disabled title="Continue">
+                    &rarr;
+                </button>
+            </div>
+
             <nav class="steps-nav">
                 <div class="step-nav-item active" id="nav-step-1">
                     <span class="step-num">1</span>
@@ -54,15 +63,6 @@
                     <span class="step-name">Export</span>
                 </div>
             </nav>
-
-            <div class="sidebar-actions" style="margin-top: auto; display: flex; gap: 0.5rem; justify-content: space-between;">
-                <button class="secondary outline" id="btn-sidebar-back" style="flex: 1; display: none;" title="Go Back">
-                    &larr;
-                </button>
-                <button id="btn-sidebar-next" style="flex: 1;" disabled title="Continue">
-                    &rarr;
-                </button>
-            </div>
         </aside>
 
         <!-- Main Workspace -->
