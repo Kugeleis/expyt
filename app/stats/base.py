@@ -7,6 +7,7 @@ Re-exports all components from models and properties modules to maintain
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from app.core.registry import Registry
 from app.stats.models import (
@@ -31,6 +32,8 @@ from app.stats.properties import (
     compute_missing_summary,
     compute_normality,
     compute_outliers,
+    compute_properties,
+    compute_properties_for_columns,
     compute_sphericity,
     compute_variance_homogeneity,
     guess_outcome_type,
@@ -65,11 +68,18 @@ class StatMethod(ABC):
         ...
 
     @abstractmethod
-    def run(self, groups: dict[str, list[float]]) -> StatResult:
+    def run(self, groups: Any) -> StatResult:
         """Run the statistical method on the grouped data.
 
+        To avoid breaking existing flat-data plugins and maintain complete backwards compatibility,
+        the `groups` parameter is typed as `Any` at the base class level. This allows subclasses
+        to type `groups` either as `dict[str, list[float]]` (flat mode) or as `HierarchicalData`
+        (hierarchical mode) without causing type checker (mypy) override mismatches. Hierarchical
+        plugins must check if the input is an instance of `HierarchicalData` and handle it accordingly.
+
         Args:
-            groups: A dictionary mapping group names to lists of numeric values.
+            groups: A dictionary mapping group names to lists of numeric values (for flat mode)
+                or a HierarchicalData instance (for hierarchical mode).
 
         Returns:
             A StatResult containing the test statistic, p-value, etc.
@@ -107,4 +117,6 @@ __all__ = [
     "compute_outliers",
     "compute_data_properties",
     "compute_data_properties_for_columns",
+    "compute_properties",
+    "compute_properties_for_columns",
 ]
