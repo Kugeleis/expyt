@@ -8,14 +8,17 @@ themselves via the ``@registry.register("name")`` decorator.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from app.stats.base import DataProperties
 
 
 @runtime_checkable
 class Applicable(Protocol):
     """Protocol for plugins that declare applicability based on data properties."""
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Return whether this plugin is applicable given data properties."""
         ...  # pragma: no cover
 
@@ -92,34 +95,31 @@ class Registry[T]:
         """Return a copy of all registered plugins as ``{name: instance}``."""
         return dict(self._plugins)
 
-    def get_applicable_intersect(self, properties_map: dict[str, Any]) -> dict[str, T]:
+    def get_applicable_intersect(self, properties_map: dict[str, DataProperties]) -> dict[str, T]:
         """Return plugins applicable across every value column property set."""
         common: set[str] | None = None
         for props in properties_map.values():
-            plugin_names = set(
-                self.get_applicable(**(props.model_dump() if hasattr(props, "model_dump") else props)).keys()
-            )
+            plugin_names = set(self.get_applicable(props).keys())
             common = plugin_names if common is None else common & plugin_names
             if not common:
                 break
         return {name: self.get(name) for name in sorted(common or [])}
 
-    def get_applicable(self, **properties: Any) -> dict[str, T]:
+    def get_applicable(self, properties: DataProperties) -> dict[str, T]:
         """Return plugins whose ``is_applicable`` returns ``True``.
 
         Plugins that don't implement the ``Applicable`` protocol are
         always included (they are assumed to be universally applicable).
 
         Args:
-            **properties: Keyword arguments forwarded to each plugin's
-                ``is_applicable`` method.
+            properties: The DataProperties object describing the dataset columns.
 
         Returns:
             A dict of ``{name: instance}`` for applicable plugins.
         """
         result: dict[str, T] = {}
         for name, plugin in self._plugins.items():
-            if isinstance(plugin, Applicable) and not plugin.is_applicable(**properties):
+            if isinstance(plugin, Applicable) and not plugin.is_applicable(properties):
                 continue
             result[name] = plugin
         return result

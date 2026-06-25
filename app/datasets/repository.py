@@ -57,6 +57,20 @@ class FileLoader(Protocol):
         ...  # pragma: no cover
 
 
+def infer_columns_from_df(df: pd.DataFrame) -> list[ColumnInfo]:
+    """Infer column schema metadata from a DataFrame."""
+    return [
+        ColumnInfo(
+            name=str(col),
+            dtype=str(df[col].dtype),
+            is_numeric=bool(pd.api.types.is_numeric_dtype(df[col])),
+            is_discrete=bool(not pd.api.types.is_numeric_dtype(df[col])),
+            nullable=True,
+        )
+        for col in df.columns
+    ]
+
+
 class CsvLoader:
     """Loader for CSV files."""
 
@@ -72,16 +86,7 @@ class CsvLoader:
     def get_schema(self, path: Path) -> list[ColumnInfo]:
         """Read the schema of a CSV file using nrows=100 to infer dtypes."""
         df = pd.read_csv(path, nrows=100)
-        return [
-            ColumnInfo(
-                name=str(col),
-                dtype=str(df[col].dtype),
-                is_numeric=bool(pd.api.types.is_numeric_dtype(df[col])),
-                is_discrete=bool(not pd.api.types.is_numeric_dtype(df[col])),
-                nullable=True,
-            )
-            for col in df.columns
-        ]
+        return infer_columns_from_df(df)
 
 
 class XptLoader:
@@ -106,16 +111,7 @@ class XptLoader:
     def get_schema(self, path: Path) -> list[ColumnInfo]:
         """Read the schema of a SAS XPT file, decoding bytes."""
         df = self.load(path)
-        return [
-            ColumnInfo(
-                name=str(col),
-                dtype=str(df[col].dtype),
-                is_numeric=bool(pd.api.types.is_numeric_dtype(df[col])),
-                is_discrete=bool(not pd.api.types.is_numeric_dtype(df[col])),
-                nullable=True,
-            )
-            for col in df.columns
-        ]
+        return infer_columns_from_df(df)
 
 
 class HdfLoader:
@@ -157,16 +153,7 @@ class HdfLoader:
                 msg = f"Key {first_key} in HDF5 file {path.name} is not a DataFrame."
                 raise TypeError(msg)
             df = df.head(1)
-        return [
-            ColumnInfo(
-                name=str(col),
-                dtype=str(df[col].dtype),
-                is_numeric=bool(pd.api.types.is_numeric_dtype(df[col])),
-                is_discrete=bool(not pd.api.types.is_numeric_dtype(df[col])),
-                nullable=True,
-            )
-            for col in df.columns
-        ]
+        return infer_columns_from_df(df)
 
 
 class ParquetLoader:
@@ -185,16 +172,7 @@ class ParquetLoader:
         """Read the schema of a Parquet file using pyarrow.read_schema."""
         schema = pq.read_schema(path)  # type: ignore[no-untyped-call]
         df = schema.empty_table().to_pandas()
-        return [
-            ColumnInfo(
-                name=str(col),
-                dtype=str(df[col].dtype),
-                is_numeric=bool(pd.api.types.is_numeric_dtype(df[col])),
-                is_discrete=bool(not pd.api.types.is_numeric_dtype(df[col])),
-                nullable=True,
-            )
-            for col in df.columns
-        ]
+        return infer_columns_from_df(df)
 
 
 class MultiFormatDatasetRepository:

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from app.core.registry import Registry
+from app.stats.base import DataProperties
 
 
 class _DummyPlugin:
@@ -21,7 +20,7 @@ class _ApplicablePlugin:
     def __init__(self, *, accept: bool = True) -> None:
         self._accept = accept
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Return a fixed value for testing."""
         return self._accept
 
@@ -91,6 +90,29 @@ def test_list_all_returns_copy() -> None:
     assert "injected" not in reg.list_all()
 
 
+def _make_dummy_properties(n_groups: int = 2) -> DataProperties:
+    return DataProperties(
+        outcome_type_guess="continuous",
+        n_groups=n_groups,
+        group_sizes={"A": 10, "B": 10},
+        normality={},
+        all_groups_normal=True,
+        missing={
+            "outcome_missing": {"count": 0, "percentage": 0.0},
+            "group_missing": {"count": 0, "percentage": 0.0},
+            "association": {
+                "test_used": "Chi-Square",
+                "statistic": None,
+                "p_value": None,
+                "significant": None,
+                "note": "Default values",
+            },
+        },
+        outliers={},
+        sampled=False,
+    )
+
+
 def test_get_applicable_filters_by_is_applicable() -> None:
     """get_applicable only returns plugins whose is_applicable returns True."""
     reg: Registry[_ApplicablePlugin] = Registry("test")
@@ -99,7 +121,7 @@ def test_get_applicable_filters_by_is_applicable() -> None:
     reg._plugins["yes"] = _ApplicablePlugin(accept=True)
     reg._plugins["no"] = _ApplicablePlugin(accept=False)
 
-    applicable = reg.get_applicable()
+    applicable = reg.get_applicable(_make_dummy_properties())
     assert "yes" in applicable
     assert "no" not in applicable
 
@@ -112,7 +134,7 @@ def test_get_applicable_includes_non_applicable_protocol() -> None:
     class AlwaysPlugin(_DummyPlugin):
         pass
 
-    applicable = reg.get_applicable()
+    applicable = reg.get_applicable(_make_dummy_properties())
     assert "always" in applicable
 
 
@@ -127,21 +149,20 @@ def test_get_applicable_intersect() -> None:
     reg: Registry[_ApplicablePlugin] = Registry("test")
 
     class _CustomPlugin:
-        def __init__(self, accept_cols: list[str]) -> None:
-            self._accept_cols = accept_cols
+        def __init__(self, accept_n_groups: list[int]) -> None:
+            self._accept_n_groups = accept_n_groups
 
-        def is_applicable(self, **properties: Any) -> bool:
-            col = properties.get("column")
-            return col in self._accept_cols
+        def is_applicable(self, properties: DataProperties) -> bool:
+            return properties.n_groups in self._accept_n_groups
 
-    reg._plugins["p1"] = _CustomPlugin(["col1"])  # type: ignore[assignment]
-    reg._plugins["p2"] = _CustomPlugin(["col2"])  # type: ignore[assignment]
-    reg._plugins["p3"] = _CustomPlugin(["col1", "col2"])  # type: ignore[assignment]
+    reg._plugins["p1"] = _CustomPlugin([2])  # type: ignore[assignment]
+    reg._plugins["p2"] = _CustomPlugin([3])  # type: ignore[assignment]
+    reg._plugins["p3"] = _CustomPlugin([2, 3])  # type: ignore[assignment]
 
     # Map of column names to properties
     properties_map = {
-        "col1": {"column": "col1"},
-        "col2": {"column": "col2"},
+        "col1": _make_dummy_properties(n_groups=2),
+        "col2": _make_dummy_properties(n_groups=3),
     }
 
     # Intersect of {"p1", "p3"} and {"p2", "p3"} is {"p3"}
@@ -150,9 +171,9 @@ def test_get_applicable_intersect() -> None:
 
     # Test early break where intersection is empty
     properties_map_empty = {
-        "col1": {"column": "col1"},
-        "col2": {"column": "col2"},
-        "col3": {"column": "col3"},
+        "col1": _make_dummy_properties(n_groups=2),
+        "col2": _make_dummy_properties(n_groups=3),
+        "col3": _make_dummy_properties(n_groups=4),
     }
     intersect_empty = reg.get_applicable_intersect(properties_map_empty)
     assert intersect_empty == {}

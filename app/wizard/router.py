@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
@@ -92,6 +93,12 @@ def get_filtered_dataset(
     if session.group_column and session.selected_groups:
         df = df[df[session.group_column].astype(str).isin(session.selected_groups)]
     return df
+
+
+def _get_grouped_data(df: pd.DataFrame, group_col: str, value_col: str) -> dict[str, list[Any]]:
+    """Helper to group a DataFrame by a column and extract non-null value lists."""
+    grouped = df.groupby(group_col)[value_col]
+    return {str(name): list(group.dropna().values) for name, group in grouped}
 
 
 @router.post("/sessions", response_model=WizardSession)
@@ -441,8 +448,7 @@ def run_statistical_evaluation(
             raise HTTPException(status_code=400, detail="Continuous method not selected")
         method = stat_registry.get(session.selected_method)
         for value_col in session.selected_value_columns:
-            grouped = filtered_df.groupby(session.group_column)[value_col]
-            group_data = {str(name): list(group.dropna().values) for name, group in grouped}
+            group_data = _get_grouped_data(filtered_df, session.group_column, value_col)
 
             try:
                 res = method.run(group_data)
@@ -458,8 +464,7 @@ def run_statistical_evaluation(
             raise HTTPException(status_code=400, detail="Discrete method not selected")
         discrete_method = stat_registry.get(session.selected_discrete_method)
         for value_col in session.selected_discrete_columns:
-            grouped = filtered_df.groupby(session.group_column)[value_col]
-            group_data = {str(name): list(group.dropna().values) for name, group in grouped}
+            group_data = _get_grouped_data(filtered_df, session.group_column, value_col)
 
             try:
                 res = discrete_method.run(group_data)
@@ -528,8 +533,7 @@ def generate_plots(
 
     for value_col in top_columns:
         props = compute_data_properties(filtered_df, value_col, session.group_column)
-        props_dict = props.model_dump()
-        applicable = plot_registry.get_applicable(**props_dict)
+        applicable = plot_registry.get_applicable(props)
 
         # Generate selected plots
         for name in req.selected_plots:

@@ -81,7 +81,7 @@ def test_ttest_applicability() -> None:
         normality={"A": 0.5, "B": 0.6},
         variance_homogeneity=0.8,
     )
-    assert ttest.is_applicable(**props_valid.model_dump()) is True
+    assert ttest.is_applicable(props_valid) is True
 
     # Inapplicable: 3 groups
     props_three_groups = DataProperties(
@@ -90,7 +90,7 @@ def test_ttest_applicability() -> None:
         normality={"A": 0.5, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.8,
     )
-    assert ttest.is_applicable(**props_three_groups.model_dump()) is False
+    assert ttest.is_applicable(props_three_groups) is False
 
     # Inapplicable: Small group size (< 2)
     props_small = DataProperties(
@@ -99,7 +99,7 @@ def test_ttest_applicability() -> None:
         normality={"A": 0.5, "B": 0.6},
         variance_homogeneity=0.8,
     )
-    assert ttest.is_applicable(**props_small.model_dump()) is False
+    assert ttest.is_applicable(props_small) is False
 
     # Inapplicable: Non-normal group
     props_non_normal = DataProperties(
@@ -108,7 +108,7 @@ def test_ttest_applicability() -> None:
         normality={"A": 0.01, "B": 0.6},
         variance_homogeneity=0.8,
     )
-    assert ttest.is_applicable(**props_non_normal.model_dump()) is False
+    assert ttest.is_applicable(props_non_normal) is False
 
 
 def test_ttest_run(normal_groups_df: pd.DataFrame) -> None:
@@ -148,7 +148,7 @@ def test_mann_whitney_applicability() -> None:
         normality={"A": 0.01, "B": 0.02},
         variance_homogeneity=0.8,
     )
-    assert mw.is_applicable(**props_valid.model_dump()) is True
+    assert mw.is_applicable(props_valid) is True
 
     # Inapplicable: 3 groups
     props_three_groups = DataProperties(
@@ -157,7 +157,7 @@ def test_mann_whitney_applicability() -> None:
         normality={"A": 0.5, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.8,
     )
-    assert mw.is_applicable(**props_three_groups.model_dump()) is False
+    assert mw.is_applicable(props_three_groups) is False
 
     # Inapplicable: Small group size
     props_small = DataProperties(
@@ -166,7 +166,7 @@ def test_mann_whitney_applicability() -> None:
         normality={"A": 0.5, "B": 0.6},
         variance_homogeneity=0.8,
     )
-    assert mw.is_applicable(**props_small.model_dump()) is False
+    assert mw.is_applicable(props_small) is False
 
 
 def test_mann_whitney_run(normal_groups_df: pd.DataFrame) -> None:
@@ -205,7 +205,7 @@ def test_anova_applicability() -> None:
         normality={"A": 0.5, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.8,
     )
-    assert anova.is_applicable(**props_valid.model_dump()) is True
+    assert anova.is_applicable(props_valid) is True
 
     # Inapplicable: < 2 groups
     props_one_group = DataProperties(
@@ -214,7 +214,7 @@ def test_anova_applicability() -> None:
         normality={"A": 0.5},
         variance_homogeneity=1.0,
     )
-    assert anova.is_applicable(**props_one_group.model_dump()) is False
+    assert anova.is_applicable(props_one_group) is False
 
     # Inapplicable: Small group size
     props_small = DataProperties(
@@ -223,7 +223,7 @@ def test_anova_applicability() -> None:
         normality={"A": 0.5, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.8,
     )
-    assert anova.is_applicable(**props_small.model_dump()) is False
+    assert anova.is_applicable(props_small) is False
 
     # Inapplicable: Non-normal
     props_non_normal = DataProperties(
@@ -232,7 +232,7 @@ def test_anova_applicability() -> None:
         normality={"A": 0.01, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.8,
     )
-    assert anova.is_applicable(**props_non_normal.model_dump()) is False
+    assert anova.is_applicable(props_non_normal) is False
 
     # Inapplicable: Heterogeneous variance
     props_hetero = DataProperties(
@@ -241,7 +241,7 @@ def test_anova_applicability() -> None:
         normality={"A": 0.5, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.02,
     )
-    assert anova.is_applicable(**props_hetero.model_dump()) is False
+    assert anova.is_applicable(props_hetero) is False
 
 
 def test_anova_run(three_groups_df: pd.DataFrame) -> None:
@@ -282,7 +282,7 @@ def test_kruskal_wallis_applicability() -> None:
         normality={"A": 0.01, "B": 0.02, "C": 0.03},
         variance_homogeneity=0.01,
     )
-    assert kw.is_applicable(**props_valid.model_dump()) is True
+    assert kw.is_applicable(props_valid) is True
 
     # Inapplicable: < 2 groups
     props_one_group = DataProperties(
@@ -291,7 +291,7 @@ def test_kruskal_wallis_applicability() -> None:
         normality={"A": 0.5},
         variance_homogeneity=1.0,
     )
-    assert kw.is_applicable(**props_one_group.model_dump()) is False
+    assert kw.is_applicable(props_one_group) is False
 
     # Inapplicable: Small group size
     props_small = DataProperties(
@@ -300,7 +300,7 @@ def test_kruskal_wallis_applicability() -> None:
         normality={"A": 0.5, "B": 0.6, "C": 0.7},
         variance_homogeneity=0.8,
     )
-    assert kw.is_applicable(**props_small.model_dump()) is False
+    assert kw.is_applicable(props_small) is False
 
 
 def test_kruskal_wallis_run(three_groups_df: pd.DataFrame) -> None:
@@ -350,7 +350,7 @@ def test_chi_square_plugin() -> None:
             "association": {"test_used": "Chi-Square", "statistic": None, "p_value": None, "significant": None},
         },
     )
-    assert chi2_method.is_applicable(**props_cont.model_dump()) is False
+    assert chi2_method.is_applicable(props_cont) is False
 
     props_cat = DataProperties(
         outcome_type_guess="categorical_nominal",
@@ -364,7 +364,7 @@ def test_chi_square_plugin() -> None:
             "association": {"test_used": "Chi-Square", "statistic": None, "p_value": None, "significant": None},
         },
     )
-    assert chi2_method.is_applicable(**props_cat.model_dump()) is True
+    assert chi2_method.is_applicable(props_cat) is True
 
     # Test execution
     groups = {
@@ -401,7 +401,7 @@ def test_stats_methods_extra_edge_cases() -> None:
             "association": {"test_used": "Chi-Square", "statistic": None, "p_value": None, "significant": None},
         },
     )
-    assert chi2_method.is_applicable(**props_one_group.model_dump()) is False
+    assert chi2_method.is_applicable(props_one_group) is False
 
     # 2. ChiSquare run with empty observed table
     with (

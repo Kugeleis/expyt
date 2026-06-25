@@ -40,35 +40,7 @@ graph TD
 
 ---
 
-## App Structure
 
-Here is an overview of the directory structure of the application:
-
-```text
-├── app/                      # Core FastAPI web application
-│   ├── core/                 # Session models, step definitions, and storage interfaces
-│   ├── datasets/             # Dataset loading and data property computation
-│   ├── exporters/            # Extensible export plugins (built-in: JSON, PDF, HTML, etc.)
-│   ├── filters/              # Extensible preprocessing filters (numeric ranges, category filters)
-│   ├── main.py               # Application factory and startup orchestrator
-│   ├── plots/                # Extensible plot generators (built-in: boxplot, scatter, etc.)
-│   ├── static/               # Client-side single-page application
-│   │   ├── modules/          # Modular ES6 frontend submodules
-│   │   │   ├── api.js        # Backend fetch request wrappers
-│   │   │   ├── elements.js   # Cached DOM element references
-│   │   │   ├── events.js     # Event listeners registration
-│   │   │   ├── helpers.js    # Shared helper utilities and error handlers
-│   │   │   ├── navigation.js # Step-by-step panel navigation handlers
-│   │   │   ├── state.js      # Global reactive state
-│   │   │   └── ui.js         # DOM updates and visual rendering
-│   │   ├── app.js            # Main bootstrap entry point
-│   │   ├── index.html        # Wizard layout interface
-│   │   └── style.css         # Single-green custom-themed Pico CSS overrides
-│   ├── stats/                # Extensible statistical plugins (ANOVA, T-Test, etc.)
-│   └── wizard/               # Router endpoints, request schemas, and transition controls
-├── test_data/                # CSV datasets used for verification (e.g., nycflights.csv)
-└── tests/                    # QA verification suite (unit, integration, and end-to-end)
-```
 
 ---
 
@@ -107,6 +79,51 @@ Quality gates are strictly enforced. All tasks can be run via the task runner:
 | `task check` | Runs all quality gates (lint -> typecheck -> test) |
 | `task bump -- <patch/minor/major>` | Bumps the application version using `bump-my-version` |
 
+### Project Directory Layout
+
+<details>
+<summary>Click to expand directory layout</summary>
+
+```text
+├── app/                      # Core FastAPI web application
+│   ├── core/                 # Session models, step definitions, and storage interfaces
+│   ├── datasets/             # Dataset loading and schema repositories
+│   │   ├── models.py         # Dataset Pydantic models
+│   │   ├── repository.py     # Dataset loader and repository classes
+│   │   └── utils.py          # Column resolution helper functions
+│   ├── exporters/            # Extensible export plugins
+│   │   ├── base.py           # Exporter base class and registry
+│   │   └── builtin/          # Built-in exporters (CSV, JSON, PDF, etc.)
+│   ├── filters/              # Extensible preprocessing filters
+│   │   ├── base.py           # Filter base class and registry
+│   │   └── builtin/          # Built-in filters (numeric range, category filters)
+│   ├── main.py               # Application factory and startup orchestrator
+│   ├── plots/                # Extensible plot generators
+│   │   ├── base.py           # PlotGenerator base class and registry
+│   │   └── builtin/          # Built-in plot generators (boxplot, ECDF, violin)
+│   ├── static/               # Client-side single-page application
+│   │   ├── modules/          # Modular ES6 frontend submodules
+│   │   │   ├── api.js        # Backend fetch request wrappers
+│   │   │   ├── elements.js   # Cached DOM element references
+│   │   │   ├── events.js     # Event listeners registration
+│   │   │   ├── helpers.js    # Shared helper utilities and error handlers
+│   │   │   ├── navigation.js # Step-by-step panel navigation handlers
+│   │   │   ├── state.js      # Global reactive state
+│   │   │   └── ui.js         # DOM updates and visual rendering
+│   │   ├── app.js            # Main bootstrap entry point
+│   │   ├── index.html        # Wizard layout interface
+│   │   └── style.css         # Single-green custom-themed Pico CSS overrides
+│   ├── stats/                # Extensible statistical plugins
+│   │   ├── base.py           # StatMethod ABC, global registry, and re-export facade
+│   │   ├── builtin/          # Built-in evaluation methods (t-test, ANOVA, Kruskal-Wallis, etc.)
+│   │   ├── models.py         # Schemas and Pydantic models for statistical results
+│   │   └── properties.py     # Data properties auto-computation logic
+│   └── wizard/               # Router endpoints, request schemas, and transition controls
+├── test_data/                # CSV datasets used for verification (e.g., nycflights.csv)
+└── tests/                    # QA verification suite (unit, integration, and end-to-end)
+```
+</details>
+
 ---
 
 ## Extensibility: Adding Custom Plugins
@@ -118,15 +135,15 @@ Adding a new plugin requires **zero changes** to core routing or session orchest
 Here is how you can add a custom statistical method in under 10 lines:
 
 ```python
-from app.stats.base import StatMethod, StatResult, stat_registry
+from app.stats.base import DataProperties, StatMethod, StatResult, stat_registry
 
 @stat_registry.register("zscore_outliers")
 class ZScoreOutliersMethod(StatMethod):
     name = "zscore_outliers"
     description = "Checks for outlier points using Z-score."
 
-    def is_applicable(self, **properties) -> bool:
-        return properties.get("n_groups", 0) >= 1
+    def is_applicable(self, properties: DataProperties) -> bool:
+        return properties.n_groups >= 1
 
     def run(self, groups) -> StatResult:
         # custom calculations...
@@ -164,7 +181,7 @@ In Step 3, the wizard dynamically queries the backend to determine which statist
    - **Missing Data & Outliers**: Automated checks to summarize dataset health.
 
 2. **Applicability Checking (`is_applicable`)**:
-   Each registered statistical method implements `is_applicable(**properties)` to declare its preconditions:
+   Each registered statistical method implements `is_applicable(properties)` to declare its preconditions:
    - **Independent Two-Sample t-test**: Requires exactly 2 groups of numeric data, with $n \ge 2$ per group, and normality satisfied for all groups.
    - **One-way ANOVA**: Requires $\ge 2$ groups of numeric data, with $n \ge 2$ per group, normality satisfied, and homogeneous variance.
    - **Mann-Whitney U**: Non-parametric; requires exactly 2 groups of numeric data with $n \ge 2$ per group.

@@ -24,17 +24,16 @@ class ChiSquare(StatMethod):
         """Return a brief description of the statistical method."""
         return "Chi-Square Test of Independence (categorical)."
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Determine whether Chi-Square is applicable.
 
         Requires outcome_type_guess to be categorical_nominal or categorical_ordinal_unclear.
         Requires n_groups >= 2.
         """
-        data_properties = DataProperties(**properties)
-        if data_properties.n_groups < 2:
+        if properties.n_groups < 2:
             return False
 
-        return data_properties.outcome_type_guess in ("categorical_nominal", "categorical_ordinal_unclear")
+        return properties.outcome_type_guess in ("categorical_nominal", "categorical_ordinal_unclear")
 
     def run(self, groups: dict[str, list[Any]]) -> StatResult:
         """Run the Chi-Square test of independence.

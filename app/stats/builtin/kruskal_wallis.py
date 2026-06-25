@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import scipy.stats as stats
 
 from app.stats.base import DataProperties, StatMethod, StatResult, stat_registry
@@ -23,16 +21,15 @@ class KruskalWallis(StatMethod):
         """Return a brief description of the statistical method."""
         return "Kruskal-Wallis H test (non-parametric)."
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Determine whether Kruskal-Wallis test is applicable.
 
         Requires >= 2 groups, each group with >= 2 samples.
         """
-        data_properties = DataProperties(**properties)
-        if data_properties.n_groups < 2:
+        if properties.n_groups < 2:
             return False
 
-        return all(size >= 2 for size in data_properties.group_sizes.values())
+        return all(size >= 2 for size in properties.group_sizes.values())
 
     def run(self, groups: dict[str, list[float]]) -> StatResult:
         """Run the Kruskal-Wallis H test.

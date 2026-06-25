@@ -18,7 +18,7 @@ from app.exporters.base import Exporter, ExportResult, exporter_registry
 from app.filters.base import Filter, filter_registry
 from app.main import app
 from app.plots.base import PlotGenerator, PlotResult, plot_registry
-from app.stats.base import StatMethod, StatResult, stat_registry
+from app.stats.base import DataProperties, StatMethod, StatResult, stat_registry
 from app.wizard.router import get_dataset_repository
 
 
@@ -66,7 +66,7 @@ class DummyStatMethod(StatMethod):
         """Return a description of the statistical method."""
         return "A dummy statistical method."
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Check if applicable."""
         return True
 
@@ -95,7 +95,7 @@ class DummyPlotGenerator(PlotGenerator):
         """Return a description of the plot generator."""
         return "A dummy plot generator."
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Check if applicable."""
         return True
 

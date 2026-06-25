@@ -7,7 +7,7 @@ themselves using the global ``plot_registry``.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from app.core.registry import Registry
 
 if TYPE_CHECKING:
-    pass
+    from app.stats.base import DataProperties
 
 
 class PlotResult(BaseModel):
@@ -47,11 +47,11 @@ class PlotGenerator(ABC):
         ...
 
     @abstractmethod
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Determine whether this plot is applicable given the data properties.
 
         Args:
-            **properties: Keyword arguments representing data properties.
+            properties: A DataProperties object containing data properties.
 
         Returns:
             True if the plot can be generated, False otherwise.

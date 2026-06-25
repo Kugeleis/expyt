@@ -54,7 +54,7 @@ def test_boxplot_applicability() -> None:
         normality={"A": 0.5, "B": 0.5},
         variance_homogeneity=0.8,
     )
-    assert bp.is_applicable(**props_valid.model_dump()) is True
+    assert bp.is_applicable(props_valid) is True
 
     # Inapplicable: No groups
     props_no_groups = DataProperties(
@@ -63,7 +63,7 @@ def test_boxplot_applicability() -> None:
         normality={},
         variance_homogeneity=0.0,
     )
-    assert bp.is_applicable(**props_no_groups.model_dump()) is False
+    assert bp.is_applicable(props_no_groups) is False
 
     # Inapplicable: Empty group
     props_empty_group = DataProperties(
@@ -72,7 +72,7 @@ def test_boxplot_applicability() -> None:
         normality={"A": 0.0, "B": 0.5},
         variance_homogeneity=0.0,
     )
-    assert bp.is_applicable(**props_empty_group.model_dump()) is False
+    assert bp.is_applicable(props_empty_group) is False
 
 
 def test_violin_applicability() -> None:
@@ -86,7 +86,7 @@ def test_violin_applicability() -> None:
         normality={"A": 0.5, "B": 0.5},
         variance_homogeneity=0.8,
     )
-    assert vp.is_applicable(**props_valid.model_dump()) is True
+    assert vp.is_applicable(props_valid) is True
 
     # Inapplicable: size < 3
     props_small_group = DataProperties(
@@ -95,10 +95,16 @@ def test_violin_applicability() -> None:
         normality={"A": 0.5, "B": 0.5},
         variance_homogeneity=0.8,
     )
-    assert vp.is_applicable(**props_small_group.model_dump()) is False
+    assert vp.is_applicable(props_small_group) is False
 
     # Inapplicable: n_groups < 1
-    assert vp.is_applicable(n_groups=0, group_sizes={}) is False
+    props_no_groups = DataProperties(
+        n_groups=0,
+        group_sizes={},
+        normality={},
+        variance_homogeneity=0.0,
+    )
+    assert vp.is_applicable(props_no_groups) is False
 
 
 def test_ecdf_applicability() -> None:
@@ -112,7 +118,7 @@ def test_ecdf_applicability() -> None:
         normality={"A": 0.0, "B": 0.0},
         variance_homogeneity=0.0,
     )
-    assert ep.is_applicable(**props_valid.model_dump()) is True
+    assert ep.is_applicable(props_valid) is True
 
     # Inapplicable: No groups
     props_no_groups = DataProperties(
@@ -121,7 +127,7 @@ def test_ecdf_applicability() -> None:
         normality={},
         variance_homogeneity=0.0,
     )
-    assert ep.is_applicable(**props_no_groups.model_dump()) is False
+    assert ep.is_applicable(props_no_groups) is False
 
 
 def test_boxplot_generate(sample_df: pd.DataFrame) -> None:

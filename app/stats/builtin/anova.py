@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 import scipy.stats as stats
 
@@ -24,27 +22,26 @@ class Anova(StatMethod):
         """Return a brief description of the statistical method."""
         return "One-way ANOVA (parametric)."
 
-    def is_applicable(self, **properties: Any) -> bool:
+    def is_applicable(self, properties: DataProperties) -> bool:
         """Determine whether One-way ANOVA is applicable.
 
         Requires >= 2 groups, each group with >= 2 samples, all groups
         satisfying normality (p > 0.05), and variance homogeneity (Levene p > 0.05).
         """
-        data_properties = DataProperties(**properties)
-        if data_properties.n_groups < 2:
+        if properties.n_groups < 2:
             return False
 
-        if any(size < 2 for size in data_properties.group_sizes.values()):
+        if any(size < 2 for size in properties.group_sizes.values()):
             return False
 
         # All groups must be normal
-        if any(not res.is_normal for res in data_properties.normality.values()):
+        if any(not res.is_normal for res in properties.normality.values()):
             return False
 
         # Homogeneous variance
-        if data_properties.variance_homogeneity is None:
+        if properties.variance_homogeneity is None:
             return False
-        return data_properties.variance_homogeneity.equal_variances
+        return properties.variance_homogeneity.equal_variances
 
     def run(self, groups: dict[str, list[float]]) -> StatResult:
         """Run the One-way ANOVA test.
