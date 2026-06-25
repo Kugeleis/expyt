@@ -263,7 +263,7 @@ class LinearMixedModel(StatMethod):
             term_names = [name for name in result.params.index if name.startswith(f"C({groups.config.group_col})")]
             if term_names:
                 constraint = ", ".join(f"{name} = 0" for name in term_names)
-                wald_res = result.wald_test(constraint)
+                wald_res = result.wald_test(constraint, scalar=True)
                 p_value = float(np.squeeze(wald_res.pvalue))
                 test_statistic = float(np.squeeze(wald_res.statistic))
             else:

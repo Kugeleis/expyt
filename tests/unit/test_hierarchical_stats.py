@@ -289,4 +289,5 @@ def test_unsupported_hierarchical_columns(hierarchical_df: Any) -> None:
     assert props.has_hierarchy
     assert props.metric_kind == "unsupported"
     import numpy as np
+
     assert np.isnan(props.icc)

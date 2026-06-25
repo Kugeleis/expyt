@@ -72,6 +72,7 @@ addopts = "--strict-markers -ra"
 filterwarnings = [
     "ignore::DeprecationWarning:websockets.*:",
     "ignore::DeprecationWarning:uvicorn.*:",
+    "ignore::statsmodels.tools.sm_exceptions.ConvergenceWarning",
 ]
 
 [tool.coverage.run]

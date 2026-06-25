@@ -597,7 +597,7 @@ def compute_hierarchical_properties(  # noqa: C901
     # 1. Determine metric kind
     unique_vals = set(df[metric].dropna().unique())
     is_numeric = pd.api.types.is_numeric_dtype(df[metric]) or pd.api.types.is_bool_dtype(df[metric])
-    if unique_vals.issubset({0, 1, 0.0, 1.0, True, False}) and len(unique_vals) > 0:
+    if unique_vals.issubset({0, 1}) and len(unique_vals) > 0:
         metric_kind: Literal["continuous", "binary_proportion", "unsupported"] = "binary_proportion"
     elif is_numeric:
         metric_kind = "continuous"
@@ -705,10 +705,7 @@ def compute_hierarchical_properties(  # noqa: C901
         has_boundary_clusters = len(boundary_cluster_ids) > 0
 
     # 6. Clustering strength
-    if metric_kind == "unsupported":
-        icc = float("nan")
-    else:
-        icc = compute_quick_icc(clean_unit, config.cluster_col, metric)
+    icc = float("nan") if metric_kind == "unsupported" else compute_quick_icc(clean_unit, config.cluster_col, metric)
 
     # 7. Power
     power_at_observed_n = 0.0

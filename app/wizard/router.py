@@ -460,8 +460,10 @@ def run_statistical_evaluation(  # noqa: C901
                 from app.stats.properties import build_cluster_aggregates, compute_quick_icc
 
                 unique_vals = set(filtered_df[value_col].dropna().unique())
-                is_bin = unique_vals.issubset({0, 1, 0.0, 1.0, True, False}) and len(unique_vals) > 0
-                is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(filtered_df[value_col])
+                is_bin = unique_vals.issubset({0, 1}) and len(unique_vals) > 0
+                is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(
+                    filtered_df[value_col]
+                )
                 metric_kind: Literal["continuous", "binary_proportion", "unsupported"] = (
                     "binary_proportion" if is_bin else ("continuous" if is_num else "unsupported")
                 )
@@ -510,11 +512,11 @@ def run_statistical_evaluation(  # noqa: C901
                 from app.stats.properties import build_cluster_aggregates, compute_quick_icc
 
                 unique_vals = set(filtered_df[value_col].dropna().unique())
-                is_bin = unique_vals.issubset({0, 1, 0.0, 1.0, True, False}) and len(unique_vals) > 0
-                is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(filtered_df[value_col])
-                metric_kind: Literal["continuous", "binary_proportion", "unsupported"] = (
-                    "binary_proportion" if is_bin else ("continuous" if is_num else "unsupported")
+                is_bin = unique_vals.issubset({0, 1}) and len(unique_vals) > 0
+                is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(
+                    filtered_df[value_col]
                 )
+                metric_kind = "binary_proportion" if is_bin else ("continuous" if is_num else "unsupported")
                 if metric_kind == "unsupported":
                     raise HTTPException(
                         status_code=400,
@@ -756,7 +758,7 @@ def set_hierarchy(  # noqa: C901
             continue
         if col in df.columns and (pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col])):
             unique_vals = set(df[col].dropna().unique())
-            if unique_vals.issubset({0, 1, 0.0, 1.0, True, False}):
+            if unique_vals.issubset({0, 1}):
                 new_discrete_cols.append(col)
     session.selected_discrete_columns = new_discrete_cols
 
@@ -769,7 +771,7 @@ def set_hierarchy(  # noqa: C901
             continue
         if pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col]):
             unique_vals = set(df[col].dropna().unique())
-            if unique_vals.issubset({0, 1, 0.0, 1.0, True, False}) and len(unique_vals) > 0:
+            if unique_vals.issubset({0, 1}) and len(unique_vals) > 0:
                 metric_kinds[col] = "binary_proportion"
             else:
                 metric_kinds[col] = "continuous"
