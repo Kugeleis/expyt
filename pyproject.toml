@@ -1,6 +1,6 @@
 [project]
 name = "expyt"
-version = "0.3.5"
+version = "0.3.6"
 description = "FastAPI Experiment Evaluation Wizard"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -92,7 +92,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
-current_version = "0.3.5"
+current_version = "0.3.6"
 commit = true
 tag = true
 pre_commit_hooks = [
