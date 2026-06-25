@@ -5,12 +5,15 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from pydantic import BaseModel
 
 from app.core.session import (
+    ClusterExclusion,
+    HierarchyConfig,
     InMemorySessionStore,
     SessionStore,
     WizardSession,
@@ -26,8 +29,8 @@ from app.filters.base import apply_filter_pipeline
 from app.plots.base import PlotResult, plot_registry
 from app.stats.base import (
     StatResult,
-    compute_data_properties,
-    compute_data_properties_for_columns,
+    compute_properties,
+    compute_properties_for_columns,
     stat_registry,
 )
 from app.wizard.schemas import (
@@ -320,6 +323,16 @@ def configure_filters(
         raise HTTPException(status_code=400, detail=f"Filter registration missing: {e}") from None
 
     session.filters_config = filter_configs
+
+    # Extract exclusions to session.excluded_clusters
+    excluded = []
+    for f in filter_configs:
+        if f.get("name") == "cluster_exclusion":
+            exclusions_list = f.get("params", {}).get("exclusions", [])
+            for item in exclusions_list:
+                excluded.append(ClusterExclusion(cluster_id=str(item["cluster_id"]), reason=str(item["reason"])))
+    session.excluded_clusters = excluded
+
     session.current_step = WizardStep.STAT_METHOD.value
     store.save(session)
     return session
@@ -340,9 +353,7 @@ def list_applicable_methods(
 
     results = []
     if session.selected_value_columns:
-        props_map = compute_data_properties_for_columns(
-            filtered_df, session.group_column, session.selected_value_columns
-        )
+        props_map = compute_properties_for_columns(session, filtered_df, session.selected_value_columns)
         applicable = stat_registry.get_applicable_intersect(props_map)
         for name, inst in applicable.items():
             results.append(
@@ -354,9 +365,7 @@ def list_applicable_methods(
             )
 
     if session.selected_discrete_columns:
-        props_map_discrete = compute_data_properties_for_columns(
-            filtered_df, session.group_column, session.selected_discrete_columns
-        )
+        props_map_discrete = compute_properties_for_columns(session, filtered_df, session.selected_discrete_columns)
         applicable_discrete = stat_registry.get_applicable_intersect(props_map_discrete)
         for name, inst in applicable_discrete.items():
             results.append(
@@ -389,9 +398,7 @@ def select_method(
     if session.selected_value_columns:
         if not req.selected_method:
             raise HTTPException(status_code=400, detail="Method for continuous columns must be selected")
-        props_map = compute_data_properties_for_columns(
-            filtered_df, session.group_column, session.selected_value_columns
-        )
+        props_map = compute_properties_for_columns(session, filtered_df, session.selected_value_columns)
         applicable = stat_registry.get_applicable_intersect(props_map)
         if req.selected_method not in applicable:
             raise HTTPException(
@@ -406,9 +413,7 @@ def select_method(
     if session.selected_discrete_columns:
         if not req.selected_discrete_method:
             raise HTTPException(status_code=400, detail="Method for discrete columns must be selected")
-        props_map_discrete = compute_data_properties_for_columns(
-            filtered_df, session.group_column, session.selected_discrete_columns
-        )
+        props_map_discrete = compute_properties_for_columns(session, filtered_df, session.selected_discrete_columns)
         applicable_discrete = stat_registry.get_applicable_intersect(props_map_discrete)
         if req.selected_discrete_method not in applicable_discrete:
             raise HTTPException(
@@ -425,7 +430,7 @@ def select_method(
 
 
 @router.get("/sessions/{session_id}/results", response_model=list[StatResult])
-def run_statistical_evaluation(
+def run_statistical_evaluation(  # noqa: C901
     session: WizardSession = Depends(get_session),
     repo: DatasetRepository = Depends(get_dataset_repository),
     store: SessionStore = Depends(get_session_store),
@@ -448,12 +453,40 @@ def run_statistical_evaluation(
             raise HTTPException(status_code=400, detail="Continuous method not selected")
         method = stat_registry.get(session.selected_method)
         for value_col in session.selected_value_columns:
-            group_data = _get_grouped_data(filtered_df, session.group_column, value_col)
+            if session.hierarchy is not None:
+                from app.datasets.hierarchical import HierarchicalData
+                from app.stats.properties import build_cluster_aggregates, compute_quick_icc
 
-            try:
-                res = method.run(group_data)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from None
+                unique_vals = set(filtered_df[value_col].dropna().unique())
+                is_bin = unique_vals.issubset({0, 1})
+                metric_kind: Literal["continuous", "binary_proportion"] = (
+                    "binary_proportion" if is_bin else "continuous"
+                )
+                excluded_ids = [ex.cluster_id for ex in session.excluded_clusters]
+                cluster_agg = build_cluster_aggregates(
+                    filtered_df, session.hierarchy, excluded_ids, value_col, metric_kind
+                )
+                clean_unit = filtered_df[~filtered_df[session.hierarchy.cluster_col].astype(str).isin(excluded_ids)]
+                icc = compute_quick_icc(clean_unit, session.hierarchy.cluster_col, value_col)
+                h_data = HierarchicalData(
+                    unit_df=filtered_df,
+                    cluster_agg=cluster_agg,
+                    config=session.hierarchy,
+                    excluded_clusters=excluded_ids,
+                    metric=value_col,
+                    metric_kind=metric_kind,
+                    icc=icc,
+                )
+                try:
+                    res = method.run(h_data)
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
+            else:
+                group_data = _get_grouped_data(filtered_df, session.group_column or "", value_col)
+                try:
+                    res = method.run(group_data)
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
 
             res.column_name = value_col
             results.append(res)
@@ -464,12 +497,37 @@ def run_statistical_evaluation(
             raise HTTPException(status_code=400, detail="Discrete method not selected")
         discrete_method = stat_registry.get(session.selected_discrete_method)
         for value_col in session.selected_discrete_columns:
-            group_data = _get_grouped_data(filtered_df, session.group_column, value_col)
+            if session.hierarchy is not None:
+                from app.datasets.hierarchical import HierarchicalData
+                from app.stats.properties import build_cluster_aggregates, compute_quick_icc
 
-            try:
-                res = discrete_method.run(group_data)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from None
+                unique_vals = set(filtered_df[value_col].dropna().unique())
+                metric_kind = "binary_proportion" if unique_vals.issubset({0, 1}) else "continuous"
+                excluded_ids = [ex.cluster_id for ex in session.excluded_clusters]
+                cluster_agg = build_cluster_aggregates(
+                    filtered_df, session.hierarchy, excluded_ids, value_col, metric_kind
+                )
+                clean_unit = filtered_df[~filtered_df[session.hierarchy.cluster_col].astype(str).isin(excluded_ids)]
+                icc = compute_quick_icc(clean_unit, session.hierarchy.cluster_col, value_col)
+                h_data = HierarchicalData(
+                    unit_df=filtered_df,
+                    cluster_agg=cluster_agg,
+                    config=session.hierarchy,
+                    excluded_clusters=excluded_ids,
+                    metric=value_col,
+                    metric_kind=metric_kind,
+                    icc=icc,
+                )
+                try:
+                    res = discrete_method.run(h_data)
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
+            else:
+                group_data = _get_grouped_data(filtered_df, session.group_column or "", value_col)
+                try:
+                    res = discrete_method.run(group_data)
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
 
             res.column_name = value_col
             results.append(res)
@@ -495,9 +553,7 @@ def list_applicable_plots(
 
     filtered_df = get_filtered_dataset(session, repo)
     if session.selected_value_columns:
-        props_map = compute_data_properties_for_columns(
-            filtered_df, session.group_column, session.selected_value_columns
-        )
+        props_map = compute_properties_for_columns(session, filtered_df, session.selected_value_columns)
         applicable = plot_registry.get_applicable_intersect(props_map)
         return [{"name": name, "description": inst.description} for name, inst in applicable.items()]
     return []
@@ -532,7 +588,7 @@ def generate_plots(
     plot_results: list[PlotResult] = []
 
     for value_col in top_columns:
-        props = compute_data_properties(filtered_df, value_col, session.group_column)
+        props = compute_properties(session, filtered_df, value_col)
         applicable = plot_registry.get_applicable(props)
 
         # Generate selected plots
@@ -543,7 +599,18 @@ def generate_plots(
                     detail=(f"Plot generator {name!r} is not applicable or not registered for column {value_col!r}"),
                 )
             generator = plot_registry.get(name)
-            plot_result = generator.generate(filtered_df, session.group_column, value_col)
+            import inspect
+
+            sig = inspect.signature(generator.generate)
+            kwargs: dict[str, Any] = {}
+            is_hier = "hierarchy" in sig.parameters or any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            )
+            if is_hier:
+                kwargs["hierarchy"] = session.hierarchy
+                kwargs["excluded_clusters"] = [ex.cluster_id for ex in session.excluded_clusters]
+
+            plot_result = generator.generate(filtered_df, session.group_column or "", value_col, **kwargs)
             plot_result.column_name = value_col
             plot_results.append(plot_result)
 
@@ -592,3 +659,78 @@ def export_results(
         media_type=export_res.content_type,
         headers={"Content-Disposition": f"attachment; filename={export_res.filename}"},
     )
+
+
+class HierarchyRequest(BaseModel):
+    """Hierarchy configuration request."""
+
+    group_col: str
+    cluster_col: str
+    unit_col: str
+    x_col: str | None = None
+    y_col: str | None = None
+
+
+class HierarchyResponse(BaseModel):
+    """Hierarchy configuration response."""
+
+    session: WizardSession
+    metric_kinds: dict[str, str]
+
+
+@router.post("/sessions/{session_id}/hierarchy", response_model=HierarchyResponse)
+def set_hierarchy(  # noqa: C901
+    req: HierarchyRequest,
+    session: WizardSession = Depends(get_session),
+    repo: DatasetRepository = Depends(get_dataset_repository),
+    store: SessionStore = Depends(get_session_store),
+) -> HierarchyResponse:
+    """Step 1b: Configure hierarchical settings."""
+    if session.dataset_id is None:
+        raise HTTPException(status_code=400, detail="Dataset not selected")
+
+    try:
+        df = repo.load_dataset(session.dataset_id)
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Dataset missing") from None
+
+    # Validate that columns exist in the dataset
+    required_cols = [req.group_col, req.cluster_col, req.unit_col]
+    for col in required_cols:
+        if col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Column {col!r} not found in dataset")
+
+    if req.x_col and req.x_col not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Column {req.x_col!r} not found in dataset")
+    if req.y_col and req.y_col not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Column {req.y_col!r} not found in dataset")
+
+    # Set session hierarchy
+    session.hierarchy = HierarchyConfig(
+        group_col=req.group_col,
+        cluster_col=req.cluster_col,
+        unit_col=req.unit_col,
+        x_col=req.x_col,
+        y_col=req.y_col,
+    )
+    store.save(session)
+
+    # Detect metric kinds for numeric columns
+    metric_kinds = {}
+    ignored_cols = {req.group_col, req.cluster_col, req.unit_col}
+    if req.x_col:
+        ignored_cols.add(req.x_col)
+    if req.y_col:
+        ignored_cols.add(req.y_col)
+
+    for col in df.columns:
+        if col in ignored_cols:
+            continue
+        if pd.api.types.is_numeric_dtype(df[col]):
+            unique_vals = set(df[col].dropna().unique())
+            if unique_vals.issubset({0, 1}):
+                metric_kinds[col] = "binary_proportion"
+            else:
+                metric_kinds[col] = "continuous"
+
+    return HierarchyResponse(session=session, metric_kinds=metric_kinds)
