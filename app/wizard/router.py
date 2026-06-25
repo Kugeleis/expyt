@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -18,6 +19,7 @@ from app.core.session import (
     SessionStore,
     WizardSession,
 )
+from app.datasets.hierarchical import HierarchicalData
 from app.datasets.models import DatasetInfo
 from app.datasets.repository import (
     DatasetRepository,
@@ -28,11 +30,13 @@ from app.exporters.base import exporter_registry
 from app.filters.base import apply_filter_pipeline
 from app.plots.base import PlotResult, plot_registry
 from app.stats.base import (
+    StatMethod,
     StatResult,
     compute_properties,
     compute_properties_for_columns,
     stat_registry,
 )
+from app.stats.properties import build_cluster_aggregates, compute_quick_icc
 from app.wizard.schemas import (
     DatasetSelectionRequest,
     ExportRequest,
@@ -41,6 +45,8 @@ from app.wizard.schemas import (
     PlotSelectionRequest,
 )
 from app.wizard.steps import WizardStep, reset_to_step, validate_step_transition
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wizard", tags=["wizard"])
 
@@ -252,10 +258,11 @@ def select_dataset(
     except KeyError:
         raise HTTPException(status_code=400, detail="Dataset missing") from None
 
-    print(
-        f"DEBUG: req.group_column={req.group_column!r}, "
-        f"req.selected_value_columns={req.selected_value_columns}, "
-        f"req.selected_discrete_columns={req.selected_discrete_columns}"
+    logger.debug(
+        "req.group_column=%r, req.selected_value_columns=%s, req.selected_discrete_columns=%s",
+        req.group_column,
+        req.selected_value_columns,
+        req.selected_discrete_columns,
     )
     is_empty_val = not req.selected_value_columns
     is_empty_disc = not req.selected_discrete_columns
@@ -431,8 +438,56 @@ def select_method(
     return session
 
 
+def _run_stat_for_column(
+    filtered_df: pd.DataFrame,
+    value_col: str,
+    method: StatMethod,
+    session: WizardSession,
+) -> StatResult:
+    if session.hierarchy is not None:
+        unique_vals = set(filtered_df[value_col].dropna().unique())
+        is_bin = unique_vals.issubset({0, 1}) and len(unique_vals) > 0
+        is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(
+            filtered_df[value_col]
+        )
+        metric_kind: Literal["continuous", "binary_proportion", "unsupported"] = (
+            "binary_proportion" if is_bin else ("continuous" if is_num else "unsupported")
+        )
+        if metric_kind == "unsupported":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column {value_col!r} is not supported in hierarchical mode. Please deselect it.",
+            )
+        excluded_ids = [ex.cluster_id for ex in session.excluded_clusters]
+        cluster_agg = build_cluster_aggregates(filtered_df, session.hierarchy, excluded_ids, value_col, metric_kind)
+        clean_unit = filtered_df[~filtered_df[session.hierarchy.cluster_col].astype(str).isin(excluded_ids)]
+        icc = compute_quick_icc(clean_unit, session.hierarchy.cluster_col, value_col)
+        h_data = HierarchicalData(
+            unit_df=filtered_df,
+            cluster_agg=cluster_agg,
+            config=session.hierarchy,
+            excluded_clusters=excluded_ids,
+            metric=value_col,
+            metric_kind=metric_kind,
+            icc=icc,
+        )
+        try:
+            res = method.run(h_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from None
+    else:
+        group_data = _get_grouped_data(filtered_df, session.group_column or "", value_col)
+        try:
+            res = method.run(group_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from None
+
+    res.column_name = value_col
+    return res
+
+
 @router.get("/sessions/{session_id}/results", response_model=list[StatResult])
-def run_statistical_evaluation(  # noqa: C901
+def run_statistical_evaluation(
     session: WizardSession = Depends(get_session),
     repo: DatasetRepository = Depends(get_dataset_repository),
     store: SessionStore = Depends(get_session_store),
@@ -455,51 +510,7 @@ def run_statistical_evaluation(  # noqa: C901
             raise HTTPException(status_code=400, detail="Continuous method not selected")
         method = stat_registry.get(session.selected_method)
         for value_col in session.selected_value_columns:
-            if session.hierarchy is not None:
-                from app.datasets.hierarchical import HierarchicalData
-                from app.stats.properties import build_cluster_aggregates, compute_quick_icc
-
-                unique_vals = set(filtered_df[value_col].dropna().unique())
-                is_bin = unique_vals.issubset({0, 1}) and len(unique_vals) > 0
-                is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(
-                    filtered_df[value_col]
-                )
-                metric_kind: Literal["continuous", "binary_proportion", "unsupported"] = (
-                    "binary_proportion" if is_bin else ("continuous" if is_num else "unsupported")
-                )
-                if metric_kind == "unsupported":
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Column {value_col!r} is not supported in hierarchical mode. Please deselect it.",
-                    )
-                excluded_ids = [ex.cluster_id for ex in session.excluded_clusters]
-                cluster_agg = build_cluster_aggregates(
-                    filtered_df, session.hierarchy, excluded_ids, value_col, metric_kind
-                )
-                clean_unit = filtered_df[~filtered_df[session.hierarchy.cluster_col].astype(str).isin(excluded_ids)]
-                icc = compute_quick_icc(clean_unit, session.hierarchy.cluster_col, value_col)
-                h_data = HierarchicalData(
-                    unit_df=filtered_df,
-                    cluster_agg=cluster_agg,
-                    config=session.hierarchy,
-                    excluded_clusters=excluded_ids,
-                    metric=value_col,
-                    metric_kind=metric_kind,
-                    icc=icc,
-                )
-                try:
-                    res = method.run(h_data)
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=str(e)) from None
-            else:
-                group_data = _get_grouped_data(filtered_df, session.group_column or "", value_col)
-                try:
-                    res = method.run(group_data)
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=str(e)) from None
-
-            res.column_name = value_col
-            results.append(res)
+            results.append(_run_stat_for_column(filtered_df, value_col, method, session))
 
     # Process discrete columns
     if session.selected_discrete_columns:
@@ -507,49 +518,7 @@ def run_statistical_evaluation(  # noqa: C901
             raise HTTPException(status_code=400, detail="Discrete method not selected")
         discrete_method = stat_registry.get(session.selected_discrete_method)
         for value_col in session.selected_discrete_columns:
-            if session.hierarchy is not None:
-                from app.datasets.hierarchical import HierarchicalData
-                from app.stats.properties import build_cluster_aggregates, compute_quick_icc
-
-                unique_vals = set(filtered_df[value_col].dropna().unique())
-                is_bin = unique_vals.issubset({0, 1}) and len(unique_vals) > 0
-                is_num = pd.api.types.is_numeric_dtype(filtered_df[value_col]) or pd.api.types.is_bool_dtype(
-                    filtered_df[value_col]
-                )
-                metric_kind = "binary_proportion" if is_bin else ("continuous" if is_num else "unsupported")
-                if metric_kind == "unsupported":
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Column {value_col!r} is not supported in hierarchical mode. Please deselect it.",
-                    )
-                excluded_ids = [ex.cluster_id for ex in session.excluded_clusters]
-                cluster_agg = build_cluster_aggregates(
-                    filtered_df, session.hierarchy, excluded_ids, value_col, metric_kind
-                )
-                clean_unit = filtered_df[~filtered_df[session.hierarchy.cluster_col].astype(str).isin(excluded_ids)]
-                icc = compute_quick_icc(clean_unit, session.hierarchy.cluster_col, value_col)
-                h_data = HierarchicalData(
-                    unit_df=filtered_df,
-                    cluster_agg=cluster_agg,
-                    config=session.hierarchy,
-                    excluded_clusters=excluded_ids,
-                    metric=value_col,
-                    metric_kind=metric_kind,
-                    icc=icc,
-                )
-                try:
-                    res = discrete_method.run(h_data)
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=str(e)) from None
-            else:
-                group_data = _get_grouped_data(filtered_df, session.group_column or "", value_col)
-                try:
-                    res = discrete_method.run(group_data)
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=str(e)) from None
-
-            res.column_name = value_col
-            results.append(res)
+            results.append(_run_stat_for_column(filtered_df, value_col, discrete_method, session))
 
     results.sort(key=lambda r: r.p_value)
 
