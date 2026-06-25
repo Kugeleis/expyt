@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Kugeleis/expyt/actions/workflows/ci.yml/badge.svg)](https://github.com/Kugeleis/expyt/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://kugeleis.github.io/expyt/)
+[![CodeQL](https://github.com/Kugeleis/expyt/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Kugeleis/expyt/actions/workflows/github-code-scanning/codeql)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 ExpYT is a modular, extensible FastAPI backend that guides users through a multi-step statistical evaluation wizard: **Dataset Selection → Preprocessing Filters → Statistical Method → Run Evaluation → Plot Selection → Report Export**.
