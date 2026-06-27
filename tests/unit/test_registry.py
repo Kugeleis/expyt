@@ -28,8 +28,7 @@ def test_register_and_get() -> None:
     reg: Registry[_DummyPlugin] = Registry("test")
 
     @reg.register("alpha")
-    class AlphaPlugin(_DummyPlugin):
-        ...
+    class AlphaPlugin(_DummyPlugin): ...
 
     result = reg.get("alpha")
     assert isinstance(result, AlphaPlugin)
@@ -40,14 +39,12 @@ def test_register_duplicate_raises() -> None:
     reg: Registry[_DummyPlugin] = Registry("test")
 
     @reg.register("dup")
-    class FirstPlugin(_DummyPlugin):
-        ...
+    class FirstPlugin(_DummyPlugin): ...
 
     with pytest.raises(ValueError, match="already registered"):
 
         @reg.register("dup")
-        class SecondPlugin(_DummyPlugin):
-            ...
+        class SecondPlugin(_DummyPlugin): ...
 
 
 def test_get_missing_raises() -> None:
@@ -62,12 +59,10 @@ def test_list_all() -> None:
     reg: Registry[_DummyPlugin] = Registry("test")
 
     @reg.register("a")
-    class PluginA(_DummyPlugin):
-        ...
+    class PluginA(_DummyPlugin): ...
 
     @reg.register("b")
-    class PluginB(_DummyPlugin):
-        ...
+    class PluginB(_DummyPlugin): ...
 
     all_plugins = reg.list_all()
     assert set(all_plugins.keys()) == {"a", "b"}
@@ -80,8 +75,7 @@ def test_list_all_returns_copy() -> None:
     reg: Registry[_DummyPlugin] = Registry("test")
 
     @reg.register("x")
-    class PluginX(_DummyPlugin):
-        ...
+    class PluginX(_DummyPlugin): ...
 
     copy = reg.list_all()
     copy["injected"] = _DummyPlugin()
@@ -129,8 +123,7 @@ def test_get_applicable_includes_non_applicable_protocol() -> None:
     reg: Registry[_DummyPlugin] = Registry("test")
 
     @reg.register("always")
-    class AlwaysPlugin(_DummyPlugin):
-        ...
+    class AlwaysPlugin(_DummyPlugin): ...
 
     applicable = reg.get_applicable(_make_dummy_properties())
     assert "always" in applicable
