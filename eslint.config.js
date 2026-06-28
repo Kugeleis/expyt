@@ -1,6 +1,6 @@
 export default [
     {
-        ignores: ['**/node_modules/**', '**/.venv/**', '**/venv/**', '**/dist/**', '**/build/**']
+        ignores: ['**/node_modules/**', '**/.venv/**', '**/venv/**', '**/dist/**', '**/build/**', '**/docs/**']
     },
     {
         languageOptions: {
