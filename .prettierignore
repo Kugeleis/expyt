@@ -1,0 +1,2 @@
+# Jinja2 templates — prettier corrupts {% if x == y %} into HTML attribute syntax
+app/templates/

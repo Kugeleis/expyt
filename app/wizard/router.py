@@ -801,9 +801,7 @@ def update_sort(
     store: SessionStore = Depends(get_session_store),
 ) -> Response:
     """Sort results table by clicked column header."""
-    available_sort_fields = {"column_name"}
-    if getattr(session, "results_df", None) is not None and isinstance(session.results_df, pd.DataFrame):
-        available_sort_fields.update(str(col) for col in session.results_df.columns)
+    available_sort_fields = {"column_name", "method_name", "test_statistic", "p_value", "effect_size", "icc", "power"}
     safe_field = field if field in available_sort_fields else "column_name"
 
     current_sort_field = request.cookies.get("sort_field", "column_name")
@@ -857,9 +855,7 @@ def generate_plots_htmx(
         top_columns = [
             res["column_name"]
             for res in session.stat_results
-            if "column_name" in res
-            and res.get("p_value") is not None
-            and res["p_value"] <= limit
+            if "column_name" in res and res.get("p_value") is not None and res["p_value"] <= limit
         ]
     else:
         top_columns = []
@@ -1709,9 +1705,7 @@ async def go_to_step_compatibility(  # noqa: C901
                     top_columns = [
                         res["column_name"]
                         for res in session.stat_results
-                        if "column_name" in res
-                        and res.get("p_value") is not None
-                        and res["p_value"] <= limit
+                        if "column_name" in res and res.get("p_value") is not None and res["p_value"] <= limit
                     ]
                 else:
                     top_columns = []
