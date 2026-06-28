@@ -1,0 +1,87 @@
+<section class="step-panel active" id="panel-step-3">
+    <h3>Step 3: Statistical Method Selection</h3>
+    <p class="step-desc">
+        Select an applicable statistical method evaluated against the properties of your filtered data.
+    </p>
+
+    <details class="info-callout" style="background: var(--pico-primary-background); border-left: 4px solid var(--pico-primary); padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1.5rem; font-size: 0.8rem;">
+        <summary style="color: var(--pico-primary); font-weight: bold; cursor: pointer; outline: none; margin-bottom: 0;">
+            ℹ️ Why are some methods not listed or disabled?
+        </summary>
+        <div style="margin-top: 0.5rem; color: var(--pico-muted-color);">
+            Statistical methods are verified against the properties of your filtered data:
+            <ul style="margin: 0.5rem 0 0 1rem; padding: 0; font-size: 0.75rem;">
+                <li><strong>Independent Two-Sample t-test:</strong> Requires exactly 2 groups of numeric data, with n &ge; 2 per group, and normality satisfied for all groups.</li>
+                <li><strong>One-way ANOVA:</strong> Requires &ge; 2 groups of numeric data, with n &ge; 2 per group, normality satisfied, and homogeneous variance.</li>
+                <li><strong>Mann-Whitney U:</strong> Non-parametric alternative to t-test; requires exactly 2 groups of numeric data with n &ge; 2 per group.</li>
+                <li><strong>Kruskal-Wallis H:</strong> Non-parametric alternative to ANOVA; requires &ge; 2 groups of numeric data with n &ge; 2 per group.</li>
+                <li><strong>Chi-Square test:</strong> Requires discrete/categorical outcome data across &ge; 2 groups.</li>
+                <li><strong>Hierarchical Regression (GMM):</strong> Requires hierarchical configuration enabled.</li>
+            </ul>
+        </div>
+    </details>
+
+    <form hx-post="/wizard/sessions/{{ session.session_id }}/submit-method" hx-target="#workspace-container">
+        <!-- Continuous Methods -->
+        {% if session.selected_value_columns %}
+            <article style="padding: 1rem; margin-bottom: 1.5rem;">
+                <header style="font-weight: bold; margin-bottom: 0.75rem; color: var(--pico-primary);">Continuous Dependent Variable Methods</header>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    {% for name, method in continuous_methods %}
+                        <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: {% if name in applicable_continuous %}pointer{% else %}not-allowed{% endif %}; opacity: {% if name in applicable_continuous %}1{% else %}0.5{% endif %};">
+                            <input type="radio" name="selected_method" value="{{ name }}"
+                                   hx-post="/wizard/sessions/{{ session.session_id }}/update-method"
+                                   hx-target="#workspace-container"
+                                   hx-trigger="change"
+                                   hx-include="#workspace-container form"
+                                   {% if name not in applicable_continuous %}disabled{% endif %}
+                                   {% if session.selected_method == name %}checked{% endif %}
+                                   style="margin-top: 0.2rem;" />
+                            <div>
+                                <strong>
+                                    {% if name == "ttest" %}t-Test
+                                    {% elif name == "anova" %}One-Way ANOVA
+                                    {% elif name == "mann_whitney" %}Mann-Whitney U
+                                    {% elif name == "kruskal_wallis" %}Kruskal-Wallis H
+                                    {% elif name == "hierarchical_regression" %}Hierarchical Regression
+                                    {% else %}{{ name }}{% endif %}
+                                </strong>
+                                <span style="font-size: 0.8rem; color: var(--pico-muted-color); display: block;">{{ method.description }}</span>
+                            </div>
+                        </label>
+                    {% endfor %}
+                </div>
+            </article>
+        {% endif %}
+
+        <!-- Discrete Methods -->
+        {% if session.selected_discrete_columns %}
+            <article style="padding: 1rem; margin-bottom: 1.5rem;">
+                <header style="font-weight: bold; margin-bottom: 0.75rem; color: var(--pico-primary);">Discrete Dependent Variable Methods</header>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    {% for name, method in discrete_methods %}
+                        <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: {% if name in applicable_discrete %}pointer{% else %}not-allowed{% endif %}; opacity: {% if name in applicable_discrete %}1{% else %}0.5{% endif %};">
+                            <input type="radio" name="selected_discrete_method" value="{{ name }}"
+                                   hx-post="/wizard/sessions/{{ session.session_id }}/update-method"
+                                   hx-target="#workspace-container"
+                                   hx-trigger="change"
+                                   hx-include="#workspace-container form"
+                                   {% if name not in applicable_discrete %}disabled{% endif %}
+                                   {% if session.selected_discrete_method == name %}checked{% endif %}
+                                   style="margin-top: 0.2rem;" />
+                            <div>
+                                <strong>
+                                    {% if name == "chi_square" %}Chi-Square Test
+                                    {% else %}{{ name }}{% endif %}
+                                </strong>
+                                <span style="font-size: 0.8rem; color: var(--pico-muted-color); display: block;">{{ method.description }}</span>
+                            </div>
+                        </label>
+                    {% endfor %}
+                </div>
+            </article>
+        {% endif %}
+
+
+    </form>
+</section>

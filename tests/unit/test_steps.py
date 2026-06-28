@@ -28,13 +28,13 @@ def test_filters_requires_dataset() -> None:
 
 def test_filters_allowed_after_dataset() -> None:
     """Filters step is allowed when dataset is selected."""
-    session = WizardSession(dataset_id="ds1", current_step="filters")
+    session = WizardSession(dataset_id="ds1", group_column="g", current_step="filters")
     validate_step_transition(session, WizardStep.FILTERS)
 
 
 def test_stat_method_requires_dataset_and_filters() -> None:
     """Stat method step requires both dataset and filters steps completed."""
-    session = WizardSession(dataset_id="ds1", current_step="filters")
+    session = WizardSession(dataset_id="ds1", group_column="g", current_step="dataset_selection")
     with pytest.raises(StepGuardError, match="filters"):
         validate_step_transition(session, WizardStep.STAT_METHOD)
 
@@ -43,6 +43,7 @@ def test_stat_method_allowed_after_filters() -> None:
     """Stat method step is allowed after dataset + filters."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="stat_method",
     )
     validate_step_transition(session, WizardStep.STAT_METHOD)
@@ -52,6 +53,7 @@ def test_results_requires_method() -> None:
     """Results step requires a statistical method to be selected."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="stat_method",
     )
     with pytest.raises(StepGuardError, match="stat_method"):
@@ -62,6 +64,7 @@ def test_results_allowed_after_method() -> None:
     """Results step is allowed after method selection."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="results",
         selected_method="ttest",
     )
@@ -80,6 +83,7 @@ def test_plot_selection_requires_results() -> None:
     """Plot selection requires stat results to be computed."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="results",
         selected_method="ttest",
     )
@@ -91,6 +95,7 @@ def test_plot_selection_allowed_after_results() -> None:
     """Plot selection is allowed after results are computed."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="plot_selection",
         selected_method="ttest",
         stat_results=[{"p_value": 0.05}],
@@ -102,6 +107,7 @@ def test_export_allowed_after_full_flow() -> None:
     """Export is allowed once all preceding steps are complete."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="export",
         selected_method="ttest",
         stat_results=[{"p_value": 0.05}],
@@ -214,8 +220,8 @@ def test_reset_to_stat_method_preserves_filters() -> None:
 
 def test_reset_to_step_gives_fresh_mutable_defaults() -> None:
     """Each reset yields independent list instances."""
-    s1 = WizardSession(dataset_id="ds1", current_step="export")
-    s2 = WizardSession(dataset_id="ds2", current_step="export")
+    s1 = WizardSession(dataset_id="ds1", group_column="g", current_step="export")
+    s2 = WizardSession(dataset_id="ds2", group_column="g", current_step="export")
     reset_to_step(s1, WizardStep.FILTERS)
     reset_to_step(s2, WizardStep.FILTERS)
     s1.selected_plots.append("boxplot")
@@ -226,6 +232,7 @@ def test_validate_allows_revisiting_completed_step() -> None:
     """Validation passes for a step whose prerequisites are still completed."""
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         current_step="stat_method",
         selected_method="ttest",
     )
@@ -239,6 +246,7 @@ def test_get_completed_steps_with_export_format() -> None:
 
     session = WizardSession(
         dataset_id="ds1",
+        group_column="g",
         selected_method="ttest",
         stat_results=[{"p_value": 0.05}],
         plot_results=[{"type": "boxplot"}],

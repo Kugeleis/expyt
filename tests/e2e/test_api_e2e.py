@@ -185,3 +185,49 @@ def test_e2e_wizard_flow(e2e_server: str) -> None:
         data = resp.json()
         assert "statistical_results" in data
         assert data["statistical_results"][0]["method_name"] == "ttest_ind"
+
+
+def test_e2e_restart_session(e2e_server: str) -> None:
+    """End-to-end test verifying that clicking the restart session button creates a new fresh session."""
+    import re
+
+    with httpx.Client(base_url=e2e_server) as client:
+        # 1. Initial page load (GET /wizard/)
+        resp = client.get("/wizard/")
+        assert resp.status_code == 200
+        html = resp.text
+
+        # Extract initial session ID from the restart button URL in the HTML
+        match = re.search(r'hx-post="/wizard/sessions/([a-f0-9]+)/restart"', html)
+        assert match is not None, "Restart session button not found in HTML"
+        session_id_1 = match.group(1)
+
+        # Verify the session actually exists by checking its state via API
+        resp_state = client.get(f"/wizard/sessions/{session_id_1}")
+        assert resp_state.status_code == 200
+        assert resp_state.json()["session_id"] == session_id_1
+
+        # 2. Simulate clicking the button (POST /wizard/sessions/{session_id}/restart with HTMX headers)
+        resp_restart = client.post(f"/wizard/sessions/{session_id_1}/restart", headers={"HX-Request": "true"})
+        assert resp_restart.status_code == 200
+        assert resp_restart.headers.get("HX-Redirect") == "/"
+
+        # 3. Follow the redirect to /wizard/ (simulate browser reloading the page)
+        resp_new = client.get("/wizard/")
+        assert resp_new.status_code == 200
+        html_new = resp_new.text
+
+        # Extract new session ID from the restart button URL in the new HTML
+        match_new = re.search(r'hx-post="/wizard/sessions/([a-f0-9]+)/restart"', html_new)
+        assert match_new is not None, "Restart session button not found in new HTML"
+        session_id_2 = match_new.group(1)
+
+        # 4. Verify that the new session ID is different and is a fresh session
+        assert session_id_1 != session_id_2, "Session ID did not change after restart"
+
+        resp_state_2 = client.get(f"/wizard/sessions/{session_id_2}")
+        assert resp_state_2.status_code == 200
+        session_data_2 = resp_state_2.json()
+        assert session_data_2["session_id"] == session_id_2
+        assert session_data_2["dataset_id"] is None
+        assert session_data_2["current_step"] == "dataset_selection"

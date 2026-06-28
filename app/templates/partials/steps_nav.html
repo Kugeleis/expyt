@@ -1,0 +1,21 @@
+<nav class="steps-nav" id="steps-nav" hx-swap-oob="true">
+    {% for step_id, label in [
+        ("dataset_selection", "Select Dataset"),
+        ("filters", "Configure Filters"),
+        ("stat_method", "Choose Method"),
+        ("results", "Results"),
+        ("plot_selection", "Select Plots"),
+        ("export", "Export")
+    ] %}
+        <div class="step-nav-item {% if session.current_step == step_id %}active{% endif %} {% if step_id in completed_steps %}completed{% endif %}"
+             id="nav-step-{{ loop.index }}"
+             hx-post="/wizard/sessions/{{ session.session_id }}/go-to/{{ step_id }}"
+             hx-include="#workspace-container form"
+             hx-target="#workspace-container"
+             style="cursor: pointer;"
+        >
+            <span class="step-num">{{ loop.index }}</span>
+            <span class="step-name">{{ label }}</span>
+        </div>
+    {% endfor %}
+</nav>

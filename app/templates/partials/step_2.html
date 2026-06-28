@@ -1,0 +1,87 @@
+<section class="step-panel active" id="panel-step-2">
+    <h3>Step 2: Preprocessing Filters</h3>
+    <p class="step-desc">
+        Configure one or more filters to preprocess the data before executing the statistical evaluation.
+    </p>
+
+    <div class="auto-grid" style="--grid-min: 320px; --grid-gap: 1.5rem;">
+        <!-- Left Column: Active Filters List -->
+        <div class="active-filters" id="active-filters">
+            <h4>Active Filters</h4>
+            {% if not session.filters_config %}
+                <p class="no-filters-msg">
+                    No filters configured. Add a filter on the right, or proceed directly.
+                </p>
+            {% else %}
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    {% for filter in session.filters_config %}
+                        <article style="padding: 0.75rem; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--pico-primary);">
+                            <div>
+                                <strong>
+                                    {% if filter.name == "numeric_range" %}Numeric Range
+                                    {% elif filter.name == "category_filter" %}Category Filter
+                                    {% elif filter.name == "cluster_exclusion" %}Cluster Exclusion
+                                    {% else %}{{ filter.name }}{% endif %}
+                                </strong>
+                                <div style="font-size: 0.8rem; color: var(--pico-muted-color); margin-top: 0.25rem;">
+                                    Column: <code>{{ filter.column or "N/A" }}</code>
+                                    {% if filter.name == "numeric_range" %}
+                                        (Min: {{ filter.params.min_val | default("None") }}, Max: {{ filter.params.max_val | default("None") }})
+                                    {% elif filter.name == "category_filter" %}
+                                        ({{ "Exclude" if filter.params.exclude else "Include" }}: {{ filter.params.values | join(", ") }})
+                                    {% elif filter.name == "cluster_exclusion" %}
+                                        (Exclusions: {{ filter.params.exclusions | map(attribute="cluster_id") | join(", ") }})
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <button type="button" class="outline contrast" style="width: auto; margin: 0; padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                    hx-delete="/wizard/sessions/{{ session.session_id }}/filters/{{ loop.index0 }}"
+                                    hx-target="#workspace-container">
+                                Remove
+                            </button>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column: Add Filter Form -->
+        <article class="add-filter-card" style="padding: 1rem; margin-bottom: 0;">
+            <h4>Add New Filter</h4>
+            <form id="new-filter-form" hx-post="/wizard/sessions/{{ session.session_id }}/add-filter" hx-target="#workspace-container">
+                <div class="auto-grid" style="--grid-min: 180px; --grid-gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <label for="filter-type">Filter Type</label>
+                        <select id="filter-type" name="filter_type"
+                                hx-post="/wizard/sessions/{{ session.session_id }}/update-filter-fields"
+                                hx-target="#filter-fields-container"
+                                hx-trigger="change">
+                            <option value="numeric_range">Numeric Range</option>
+                            <option value="category_filter">Category Filter</option>
+                            {% if session.hierarchy %}
+                                <option value="cluster_exclusion">Cluster Exclusion</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filter-col">Column</label>
+                        <select id="filter-col" name="column">
+                            {% for col in columns %}
+                                <option value="{{ col.name }}">{{ col.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dynamic Fields Container -->
+                <div id="filter-fields-container" style="margin-bottom: 1rem;">
+                    {% include "partials/filter_fields_numeric.html" %}
+                </div>
+
+                <button type="submit" class="secondary outline" style="width: 100%;">Add Filter</button>
+            </form>
+        </article>
+    </div>
+
+
+</section>

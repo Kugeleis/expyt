@@ -1,19 +1,19 @@
 """Smoke test for the FastAPI application."""
 
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 
-async def test_app_starts(client: AsyncClient) -> None:
+def test_app_starts(client: TestClient) -> None:
     """The application should respond to OpenAPI docs endpoint."""
-    response = await client.get("/openapi.json")
+    response = client.get("/openapi.json")
     assert response.status_code == 200
     data = response.json()
     assert data["info"]["title"] == "ExPyRi — Experiment Evaluation Wizard"
 
 
-async def test_root_serves_homepage(client: AsyncClient) -> None:
+def test_root_serves_homepage(client: TestClient) -> None:
     """The root URL should serve the wizard homepage HTML."""
-    response = await client.get("/")
+    response = client.get("/")
     assert response.status_code == 200
     assert "ExPyRi" in response.text
     assert "Experiment Evaluation Wizard" in response.text

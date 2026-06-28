@@ -1,8 +1,2 @@
-import { initEventListeners } from './modules/events.js';
-import { startNewSession } from './modules/api.js';
-
-// Initialize application
-window.addEventListener('DOMContentLoaded', async () => {
-    initEventListeners();
-    await startNewSession();
-});
+// No client-side wizard routing is required anymore.
+// All interactions are server-driven via HTMX.

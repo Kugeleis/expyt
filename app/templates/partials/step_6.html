@@ -1,0 +1,30 @@
+<section class="step-panel active" id="panel-step-6">
+    <h3>Step 6: Export & Download</h3>
+    <p class="step-desc">Choose a format to export your final experiment evaluation report.</p>
+
+    <div class="auto-grid" style="--grid-min: 220px; --grid-gap: 1.25rem;">
+        <a href="/wizard/sessions/{{ session.session_id }}/export?format=pdf" style="text-decoration: none; color: inherit; display: block;" target="_blank">
+            <article class="exporter-card active" style="margin-bottom: 0; cursor: pointer; height: 100%;">
+                <div class="exporter-icon">📕</div>
+                <h4>PDF Report</h4>
+                <p>Visual PDF containing statistical summaries, results, and generated plots.</p>
+            </article>
+        </a>
+        
+        <a href="/wizard/sessions/{{ session.session_id }}/export?format=json" style="text-decoration: none; color: inherit; display: block;" target="_blank">
+            <article class="exporter-card" style="margin-bottom: 0; cursor: pointer; height: 100%;">
+                <div class="exporter-icon">💻</div>
+                <h4>JSON Schema</h4>
+                <p>Export all raw results, parameters, and metadata as a standard JSON object.</p>
+            </article>
+        </a>
+        
+        <a href="/wizard/sessions/{{ session.session_id }}/export?format=csv" style="text-decoration: none; color: inherit; display: block;" target="_blank">
+            <article class="exporter-card" style="margin-bottom: 0; cursor: pointer; height: 100%;">
+                <div class="exporter-icon">📊</div>
+                <h4>CSV Dataset</h4>
+                <p>Export the preprocessed and cleaned dataset as a CSV file.</p>
+            </article>
+        </a>
+    </div>
+</section>

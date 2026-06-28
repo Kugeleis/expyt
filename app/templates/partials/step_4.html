@@ -1,0 +1,112 @@
+<section class="step-panel active" id="panel-step-4">
+    <h3>Step 4: Statistical Results</h3>
+    <p class="step-desc">Below are the execution results of your statistical test.</p>
+
+    <article class="results-card" id="results-card" style="padding: 1.25rem;">
+        {% if sig_chart_base64 %}
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <img src="data:image/png;base64,{{ sig_chart_base64 }}" alt="Significance Chart" style="max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);" />
+            </div>
+        {% endif %}
+
+        <div id="statResultsContainer" class="overflow-auto">
+            {% if not session.stat_results %}
+                <p>No statistical results generated.</p>
+            {% else %}
+                <table class="results-table striped">
+                    <thead>
+                        <tr>
+                            {% for label, field in [
+                                ("Column", "column_name"),
+                                ("Method", "method_name"),
+                                ("Statistic", "test_statistic"),
+                                ("p-value", "p_value"),
+                                ("Effect Size", "effect_size")
+                            ] %}
+                                <th scope="col" style="cursor: pointer; user-select: none;"
+                                    hx-post="/wizard/sessions/{{ session.session_id }}/update-sort?field={{ field }}"
+                                    hx-target="#workspace-container">
+                                    {{ label }}
+                                    {% if sort_field == field %}
+                                        {% if sort_asc %} ▲{% else %} ▼{% endif %}
+                                    {% endif %}
+                                </th>
+                            {% endfor %}
+                            {% if session.hierarchy %}
+                                <th scope="col" style="cursor: pointer; user-select: none;"
+                                    hx-post="/wizard/sessions/{{ session.session_id }}/update-sort?field=icc"
+                                    hx-target="#workspace-container">
+                                    ICC
+                                    {% if sort_field == "icc" %}
+                                        {% if sort_asc %} ▲{% else %} ▼{% endif %}
+                                    {% endif %}
+                                </th>
+                                <th scope="col" style="cursor: pointer; user-select: none;"
+                                    hx-post="/wizard/sessions/{{ session.session_id }}/update-sort?field=power"
+                                    hx-target="#workspace-container">
+                                    Power
+                                    {% if sort_field == "power" %}
+                                        {% if sort_asc %} ▲{% else %} ▼{% endif %}
+                                    {% endif %}
+                                </th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set limit = plots_sig_filter | default(0.05) | float %}
+                        {% set strictLimit = limit * 0.2 %}
+                        {% for res in session.stat_results %}
+                            {% set pval = res.p_value %}
+                            {% set is_sig = pval is not none and pval <= limit %}
+                            {% set is_strict = pval is not none and pval <= strictLimit %}
+                            <tr {% if is_strict %}style="background-color: rgba(16, 185, 129, 0.12);"{% elif is_sig %}style="background-color: rgba(250, 204, 21, 0.12);"{% endif %}>
+                                <td>{{ res.column_name }}</td>
+                                <td>
+                                    {% if res.method_name == "ttest" %}t-Test
+                                    {% elif res.method_name == "anova" %}ANOVA
+                                    {% elif res.method_name == "mann_whitney" %}Mann-Whitney U
+                                    {% elif res.method_name == "kruskal_wallis" %}Kruskal-Wallis H
+                                    {% elif res.method_name == "chi_square" %}Chi-Square
+                                    {% elif res.method_name == "hierarchical_regression" %}Hierarchical Regression
+                                    {% else %}{{ res.method_name }}{% endif %}
+                                </td>
+                                <td>{% if res.test_statistic is not none %}{{ "%.4f"|format(res.test_statistic) }}{% endif %}</td>
+                                <td>{% if res.p_value is not none %}{{ "%.6f"|format(res.p_value) }}{% endif %}</td>
+                                <td>{% if res.effect_size is not none %}{{ "%.4f"|format(res.effect_size) }}{% endif %}</td>
+                                {% if session.hierarchy %}
+                                    <td>{% if res.icc is not none %}{{ "%.4f"|format(res.icc) }}{% else %}N/A{% endif %}</td>
+                                    <td>{% if res.power is not none %}{{ "%.4f"|format(res.power) }}{% else %}N/A{% endif %}</td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+
+        <!-- Filter bar -->
+        <div id="plots-filter-form" style="margin-top: 1rem; border-top: 1px solid var(--pico-border-color); padding-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <label for="plots-sig-filter" style="margin-bottom: 0; font-weight: 600; white-space: nowrap;">Plot top variables with p-value &le;</label>
+                <input
+                    type="number"
+                    id="plots-sig-filter"
+                    name="plots_sig_filter"
+                    value="{{ plots_sig_filter | default(0.05) }}"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    style="width: 90px; margin-bottom: 0;"
+                    hx-post="/wizard/sessions/{{ session.session_id }}/update-sig-limit"
+                    hx-target="#workspace-container"
+                    hx-trigger="change"
+                />
+            </div>
+            <span id="filtered-plots-counter" style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: 550;">
+                Matches {{ matched_count }} variables
+            </span>
+        </div>
+    </article>
+
+
+</section>

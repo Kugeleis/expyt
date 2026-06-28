@@ -1,0 +1,31 @@
+<div class="sidebar-actions" id="sidebar-actions" style="display: flex; gap: 0.5rem; justify-content: space-between" hx-swap-oob="true">
+    {% if session.current_step != "dataset_selection" %}
+        <button
+            class="secondary outline"
+            id="btn-sidebar-back"
+            style="flex: 1;"
+            title="Go Back"
+            hx-post="/wizard/sessions/{{ session.session_id }}/navigate?direction=back"
+            hx-target="#workspace-container"
+        >
+            &larr;
+        </button>
+    {% endif %}
+    
+    {% if session.current_step != "export" %}
+        {% set steps_list = ["dataset_selection", "filters", "stat_method", "results", "plot_selection", "export"] %}
+        {% set current_idx = steps_list.index(session.current_step) %}
+        {% set next_step = steps_list[current_idx + 1] %}
+        <button
+            id="btn-sidebar-next"
+            style="flex: 1;"
+            title="Continue"
+            hx-post="/wizard/sessions/{{ session.session_id }}/go-to/{{ next_step }}"
+            hx-include="#workspace-container form"
+            hx-target="#workspace-container"
+            {% if not is_step_completed %}disabled{% endif %}
+        >
+            &rarr;
+        </button>
+    {% endif %}
+</div>

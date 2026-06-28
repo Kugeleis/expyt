@@ -166,24 +166,6 @@ def test_wizard_negative_step_guards(client: TestClient) -> None:
     files = {"file": ("normal_data.csv", csv_content, "text/csv")}
     client.post("/wizard/upload", files=files)
 
-    # Select dataset
-    client.post(
-        f"/wizard/sessions/{session_id}/dataset",
-        json={
-            "dataset_id": "normal_data",
-            "group_column": "group",
-            "selected_value_columns": [],
-        },
-    )
-
-    # Now filters is required. Try to run method selection.
-    resp = client.post(
-        f"/wizard/sessions/{session_id}/method",
-        json={"selected_method": "ttest_ind"},
-    )
-    assert resp.status_code == 400
-    assert "filters" in resp.json()["missing"]
-
 
 def test_wizard_negative_invalid_payloads(client: TestClient) -> None:
     """Invalid requests return 400 Bad Request."""
@@ -595,3 +577,303 @@ def test_nycflights_origin_group(client: TestClient) -> None:
     assert res_data["group_column"] == "origin"
     assert set(res_data["selected_value_columns"]) == set(payload["selected_value_columns"])
     assert set(res_data["selected_discrete_columns"]) == set(payload["selected_discrete_columns"])
+
+
+def test_select_cluster_column_numeric_fails(client: TestClient) -> None:
+    """Selecting a numeric column as cluster column (L1) returns 400."""
+    csv_content = b"group,cluster,value\nA,1.0,10.0\nA,1.0,10.5\nB,2.0,11.0\nB,2.0,10.2\n"
+    files = {"file": ("uploaded_numeric_cluster.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    # Toggle hierarchy to enable hierarchical mode
+    resp = client.post(f"/wizard/sessions/{session_id}/toggle-hierarchy?enabled=true", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+
+    # Select dataset
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/select-dataset-id",
+        data={"dataset_id": "uploaded_numeric_cluster"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Try to submit config with numeric 'cluster' (which is float64) as cluster column
+    # via HTMX endpoint
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/submit-dataset-config",
+        data={
+            "group_column": "group",
+            "cluster_col": "cluster",
+            "selected_value_columns": ["value"],
+        },
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 400
+    assert "must be discrete/categorical, but it is numeric" in resp.text
+
+
+def test_set_hierarchy_numeric_cols_fails(client: TestClient) -> None:
+    """Hierarchy API validation fails if group or cluster column is numeric."""
+    csv_content = b"group,cluster,value\n1.0,X,10.0\n1.0,Y,10.5\n2.0,X,11.0\n2.0,Y,10.2\n"
+    files = {"file": ("uploaded_hier_numeric.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    # Set dataset first
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/dataset",
+        json={
+            "dataset_id": "uploaded_hier_numeric",
+            "group_column": "cluster",
+            "selected_value_columns": ["value"],
+        },
+    )
+    assert resp.status_code == 200
+
+    # Try to set hierarchy with numeric group_col
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/hierarchy",
+        json={
+            "group_col": "group",
+            "cluster_col": "cluster",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Group column 'group' must be discrete/categorical, but it is numeric." in resp.json()["detail"]
+
+    # Try to set hierarchy with numeric cluster_col
+    csv_content_cluster = b"group,cluster,value\nA,1.0,10.0\nA,2.0,10.5\nB,1.0,11.0\nB,2.0,10.2\n"
+    files = {"file": ("uploaded_hier_numeric_cluster.csv", csv_content_cluster, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/dataset",
+        json={
+            "dataset_id": "uploaded_hier_numeric_cluster",
+            "group_column": "group",
+            "selected_value_columns": ["value"],
+        },
+    )
+    assert resp.status_code == 200
+
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/hierarchy",
+        json={
+            "group_col": "group",
+            "cluster_col": "cluster",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Cluster column 'cluster' must be discrete/categorical, but it is numeric." in resp.json()["detail"]
+
+
+def test_update_group_and_cluster_cols_populate_defaults(client: TestClient) -> None:
+    """Verifies that update-group-col and update-cluster-col populate default selections."""
+    csv_content = b"group,cluster,value\nA,X,10.0\nA,Y,10.5\nB,X,11.0\nB,Y,10.2\n"
+    files = {"file": ("defaults_test.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    # Select dataset id
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/select-dataset-id",
+        data={"dataset_id": "defaults_test"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Update group column
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/update-group-col",
+        data={"group_column": "group"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Verify session has selected_groups populated by default
+    resp_get = client.get(f"/wizard/sessions/{session_id}")
+    assert resp_get.json()["selected_groups"] == ["A", "B"]
+
+    # Toggle hierarchy to true
+    resp = client.post(f"/wizard/sessions/{session_id}/toggle-hierarchy?enabled=true", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+
+    # Update cluster column
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/update-cluster-col",
+        data={"cluster_col": "cluster"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Verify session has selected_clusters populated by default
+    resp_get = client.get(f"/wizard/sessions/{session_id}")
+    assert resp_get.json()["hierarchy"]["selected_clusters"] == ["X", "Y"]
+
+
+def test_select_cluster_column_same_as_group_fails(client: TestClient) -> None:
+    """Selecting the same column for both group and cluster returns 400."""
+    csv_content = b"group,cluster,value\nA,X,10.0\nA,Y,10.5\nB,X,11.0\nB,Y,10.2\n"
+    files = {"file": ("uploaded_same_col.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    resp = client.post(f"/wizard/sessions/{session_id}/toggle-hierarchy?enabled=true", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/select-dataset-id",
+        data={"dataset_id": "uploaded_same_col"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Try to submit config with cluster_col equal to group_column
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/submit-dataset-config",
+        data={
+            "group_column": "group",
+            "cluster_col": "group",
+            "selected_value_columns": ["value"],
+        },
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 400
+    assert "Cluster column must not be the same as the group column." in resp.text
+
+
+def test_set_hierarchy_same_cols_fails(client: TestClient) -> None:
+    """Hierarchy API validation fails if group_col is equal to cluster_col."""
+    csv_content = b"group,cluster,value\nA,X,10.0\nA,Y,10.5\nB,X,11.0\nB,Y,10.2\n"
+    files = {"file": ("uploaded_hier_same.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/dataset",
+        json={
+            "dataset_id": "uploaded_hier_same",
+            "group_column": "group",
+            "selected_value_columns": ["value"],
+        },
+    )
+    assert resp.status_code == 200
+
+    # Try to set hierarchy with group_col == cluster_col
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/hierarchy",
+        json={
+            "group_col": "group",
+            "cluster_col": "group",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Cluster column must not be the same as the group column." in resp.json()["detail"]
+
+
+def test_select_dataset_preselects_all_dependent_columns(client: TestClient) -> None:
+    """Select dataset endpoint preselects all dependent columns by default."""
+    csv_content = b"group,numeric_val,categorical_val\nA,10.0,Yes\nA,10.5,No\nB,11.0,Yes\nB,10.2,No\n"
+    files = {"file": ("preselect_test.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    # Select dataset
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/select-dataset-id",
+        data={"dataset_id": "preselect_test"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Update group column to "group"
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/update-group-col",
+        data={"group_column": "group"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # Verify session has both columns pre-populated by default and the group column excluded
+    resp_get = client.get(f"/wizard/sessions/{session_id}")
+    assert resp_get.json()["selected_value_columns"] == ["numeric_val"]
+    assert resp_get.json()["selected_discrete_columns"] == ["categorical_val"]
+
+
+def test_restart_session_e2e(client: TestClient) -> None:
+    """Test that restarting a session creates a new fresh session or redirects."""
+    # 1. Create a session
+    resp = client.post("/wizard/sessions")
+    assert resp.status_code == 200
+    session_id = resp.json()["session_id"]
+
+    # Select dataset to make session dirty
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/select-dataset-id",
+        data={"dataset_id": "preselect_test"},
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 200
+
+    # 2. Restart via HTMX request
+    resp = client.post(f"/wizard/sessions/{session_id}/restart", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    # HTMX request should receive the HX-Redirect header to reload root
+    assert resp.headers.get("HX-Redirect") == "/"
+
+    # 3. Restart via JSON request (standard REST client)
+    resp = client.post(f"/wizard/sessions/{session_id}/restart", headers={"Accept": "application/json"})
+    assert resp.status_code == 200
+    new_session = resp.json()
+    assert new_session["session_id"] != session_id
+    assert new_session["dataset_id"] is None
+    assert new_session["current_step"] == "dataset_selection"
+
+
+def test_restart_session_works_on_all_steps(client: TestClient) -> None:
+    """Test that restarting a session works successfully from all 6 steps."""
+    from app.wizard.router import get_session_store
+
+    store = get_session_store()
+
+    for step_name in ["dataset_selection", "filters", "stat_method", "results", "plot_selection", "export"]:
+        # Create a session
+        session = store.create()
+        session_id = session.session_id
+        session.dataset_id = "preselect_test"
+        session.current_step = step_name
+
+        if step_name in ("results", "plot_selection", "export"):
+            session.selected_value_columns = ["numeric_val"]
+            session.selected_method = "ttest"
+            session.stat_results = [{"column_name": "numeric_val", "p_value": 0.01}]
+
+        store.save(session)
+
+        # Call restart endpoint
+        resp = client.post(f"/wizard/sessions/{session_id}/restart", headers={"HX-Request": "true"})
+        assert resp.status_code == 200
+        assert resp.headers.get("HX-Redirect") == "/"

@@ -87,25 +87,18 @@ _FIELD_DEFAULTS: dict[str, object] = {
 def _completed_steps(session: WizardSession) -> set[WizardStep]:
     """Derive which steps have been completed from session state."""
     completed: set[WizardStep] = set()
-    if session.dataset_id is not None:
+    if session.dataset_id is not None and session.group_column is not None:
         completed.add(WizardStep.DATASET_SELECTION)
     # Filters step is considered complete once dataset is chosen
     # (filters may be empty — that's a valid choice).
     if session.dataset_id is not None and session.current_step != WizardStep.DATASET_SELECTION.value:
         current_idx = _STEP_ORDER.index(WizardStep(session.current_step))
         filter_idx = _STEP_ORDER.index(WizardStep.FILTERS)
-        if current_idx > filter_idx:
+        if current_idx >= filter_idx:
             completed.add(WizardStep.FILTERS)
 
-    has_continuous = bool(session.selected_value_columns)
-    has_discrete = bool(session.selected_discrete_columns)
 
-    if not has_continuous and not has_discrete:
-        method_selected = session.selected_method is not None or session.selected_discrete_method is not None
-    else:
-        method_selected = (not has_continuous or session.selected_method is not None) and (
-            not has_discrete or session.selected_discrete_method is not None
-        )
+    method_selected = session.selected_method is not None or session.selected_discrete_method is not None
 
     if method_selected:
         completed.add(WizardStep.STAT_METHOD)

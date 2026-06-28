@@ -40,8 +40,20 @@ def create_app() -> FastAPI:
     # Register router
     application.include_router(router)
 
-    # Mount static files at root
-    application.mount("/", StaticFiles(directory="app/static", html=True), name="static")
+    from fastapi import Depends
+    from fastapi.responses import HTMLResponse
+
+    from app.core.session import SessionStore
+    from app.wizard.router import get_session_store, render_step
+
+    @application.get("/", response_class=HTMLResponse)
+    def root(request: Request, store: SessionStore = Depends(get_session_store)) -> Response:
+        """Render the wizard homepage with a new session."""
+        session = store.create()
+        return render_step(request, session, store)
+
+    # Mount static files at /static
+    application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     # Add middleware to disable caching for static assets during development
     @application.middleware("http")
@@ -51,7 +63,7 @@ def create_app() -> FastAPI:
     ) -> Response:
         response = await call_next(request)
         path = request.url.path
-        if path.endswith((".css", ".js", ".html")) or path == "/":
+        if path.startswith("/static"):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"

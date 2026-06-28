@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ExPyRi — Experiment Evaluation Wizard</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@anyblades/pico/css/pico.min.css" />
+        <link rel="stylesheet" href="/static/style.css" />
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
+    </head>
+    <body hx-headers='{"HX-Request": "true"}'>
+        <div class="glow-container">
+            <div class="glow-circle glow-1"></div>
+            <div class="glow-circle glow-2"></div>
+        </div>
+
+        <div class="app-container">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <div class="logo">
+                    <span class="icon">📊</span>
+                    <h1>ExPyRi</h1>
+                </div>
+                
+                {% include "partials/session_info.html" %}
+                {% include "partials/sidebar_actions.html" %}
+                {% include "partials/steps_nav.html" %}
+            </aside>
+
+            <!-- Main Workspace -->
+            <main class="main-content">
+                <header class="main-header">
+                    <h2>Experiment Evaluation Wizard</h2>
+                    <button class="outline secondary btn-restart" 
+                            hx-post="/wizard/sessions/{{ session.session_id }}/restart" 
+                            hx-target="body"
+                            hx-confirm="Are you sure you want to restart the session? All configuration will be lost.">
+                        Restart Session
+                    </button>
+                </header>
+
+                <article class="card-workspace" id="workspace-container">
+                    {% include "partials/workspace.html" %}
+                </article>
+            </main>
+        </div>
+
+        <!-- Error Toast (HTMX Error handling) -->
+        <div class="toast hidden" id="error-toast" style="display: none;">
+            <span class="toast-icon">❌</span>
+            <span class="toast-message" id="toast-msg">An error occurred</span>
+            <button class="toast-close" onclick="document.getElementById('error-toast').style.display='none';">&times;</button>
+        </div>
+
+        <script>
+            // Simple HTMX error handler
+            document.body.addEventListener('htmx:responseError', function(evt) {
+                const errorToast = document.getElementById('error-toast');
+                const toastMsg = document.getElementById('toast-msg');
+                if (errorToast && toastMsg) {
+                    try {
+                        const detail = JSON.parse(evt.detail.xhr.responseText);
+                        toastMsg.textContent = detail.detail || "An error occurred";
+                    } catch(e) {
+                        toastMsg.textContent = evt.detail.xhr.responseText || "An error occurred";
+                    }
+                    errorToast.style.display = 'flex';
+                    errorToast.classList.remove('hidden');
+                    setTimeout(() => {
+                        errorToast.style.display = 'none';
+                    }, 5000);
+                }
+            });
+        </script>
+        <script type="module" src="/static/pacman.js" defer></script>
+    </body>
+</html>

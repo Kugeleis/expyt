@@ -1,0 +1,13 @@
+{% if session.current_step == "dataset_selection" %}
+    {% include "partials/step_1.html" %}
+{% elif session.current_step == "filters" %}
+    {% include "partials/step_2.html" %}
+{% elif session.current_step == "stat_method" %}
+    {% include "partials/step_3.html" %}
+{% elif session.current_step == "results" %}
+    {% include "partials/step_4.html" %}
+{% elif session.current_step == "plot_selection" %}
+    {% include "partials/step_5.html" %}
+{% elif session.current_step == "export" %}
+    {% include "partials/step_6.html" %}
+{% endif %}

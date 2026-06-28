@@ -1,0 +1,83 @@
+<section class="step-panel active" id="panel-step-5">
+    <h3>Step 5: Visualizations</h3>
+    <p class="step-desc">
+        Select from the applicable plot types to generate visualizations of your data.
+    </p>
+
+    <form hx-post="/wizard/sessions/{{ session.session_id }}/generate-plots" hx-target="#workspace-container">
+        <div class="plots-selector-row" style="background-color: rgba(255, 255, 255, 0.01); padding: 0.75rem; border: 1px solid var(--pico-border-color); border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 0.5rem;">Available Plot Types</div>
+            
+            <div id="plots-selector" style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-bottom: 0.75rem;">
+                {% for name, plot in applicable_plots.items() %}
+                    <label style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0; cursor: pointer;">
+                        <input type="checkbox" name="selected_plots" value="{{ name }}"
+                               {% if name in session.selected_plots %}checked{% endif %} />
+                        {{ name | title }}
+                    </label>
+                {% endfor %}
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; border-top: 1px solid var(--pico-border-color); padding-top: 0.5rem;">
+                <span id="plots-generation-counter" style="font-size: 0.85rem; color: var(--pico-muted-color);">
+                    Will generate plots for variables with p-value &le; {{ plots_sig_filter | default(0.05) }}
+                </span>
+                <button type="submit" id="btn-generate-plots" style="width: auto; margin: 0; padding: 0.4rem 1rem; font-size: 0.85rem;">
+                    Generate Plots
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div id="plots-display" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
+        {% if not session.plot_results %}
+            <span class="no-plots-msg">Select plot types and click Generate Plots above.</span>
+        {% else %}
+            {% for group in session.plot_results | groupby('column_name') %}
+                {% set ns = namespace(col_res=none) %}
+                {% for res in session.stat_results %}
+                    {% if res.column_name == group.grouper %}
+                        {% set ns.col_res = res %}
+                    {% endif %}
+                {% endfor %}
+                <article style="padding: 1rem; margin-bottom: 1.5rem;">
+                    <header style="text-align: left; font-weight: 600; margin-bottom: 0.75rem; border-bottom: 1px solid var(--pico-border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                        <div>
+                            Column: <code>{{ group.grouper }}</code>
+                        </div>
+                        {% if ns.col_res %}
+                            <div style="font-size: 0.8rem; color: var(--pico-muted-color); font-weight: normal;">
+                                <span>Method: 
+                                    {% if ns.col_res.method_name == "ttest" %}t-Test
+                                    {% elif ns.col_res.method_name == "anova" %}ANOVA
+                                    {% elif ns.col_res.method_name == "mann_whitney" %}Mann-Whitney U
+                                    {% elif ns.col_res.method_name == "kruskal_wallis" %}Kruskal-Wallis H
+                                    {% elif ns.col_res.method_name == "chi_square" %}Chi-Square
+                                    {% elif ns.col_res.method_name == "hierarchical_regression" %}Hierarchical Regression
+                                    {% else %}{{ ns.col_res.method_name }}{% endif %}
+                                </span>
+                                {% if ns.col_res.test_statistic is not none %} | <span title="Test Statistic">Stat: {{ "%.4f"|format(ns.col_res.test_statistic) }}</span>{% endif %}
+                                {% if ns.col_res.p_value is not none %} | <span title="p-value">p: {{ "%.6f"|format(ns.col_res.p_value) }}</span>{% endif %}
+                                {% if ns.col_res.effect_size is not none %} | <span title="Effect Size">Effect: {{ "%.4f"|format(ns.col_res.effect_size) }}</span>{% endif %}
+                                {% if ns.col_res.icc is not none %} | <span title="Intraclass Correlation Coefficient">ICC: {{ "%.4f"|format(ns.col_res.icc) }}</span>{% endif %}
+                                {% if ns.col_res.power is not none %} | <span title="Statistical Power">Power: {{ "%.4f"|format(ns.col_res.power) }}</span>{% endif %}
+                            </div>
+                        {% endif %}
+                    </header>
+                    <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center; align-items: flex-start;">
+                        {% for plot in group.list %}
+                            <div style="flex: 1; min-width: 280px; max-width: 480px; text-align: center;">
+                                <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">
+                                    {{ plot.plot_type | title }} Plot
+                                </div>
+                                <img src="data:image/png;base64,{{ plot.image_base64 }}" alt="{{ plot.plot_type }} plot" style="max-width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--pico-border-color); padding: 0.25rem;" />
+                            </div>
+                        {% endfor %}
+                    </div>
+                </article>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+
+</section>
