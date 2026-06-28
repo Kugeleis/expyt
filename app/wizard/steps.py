@@ -97,7 +97,6 @@ def _completed_steps(session: WizardSession) -> set[WizardStep]:
         if current_idx >= filter_idx:
             completed.add(WizardStep.FILTERS)
 
-
     method_selected = session.selected_method is not None or session.selected_discrete_method is not None
 
     if method_selected:

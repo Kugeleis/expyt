@@ -354,7 +354,3 @@ def test_playwright_visualization_cards(playwright_server: str, page: Page) -> N
 
     second_card_images = cards.nth(1).locator("img")
     expect(second_card_images).to_have_count(2)
-
-
-
-
