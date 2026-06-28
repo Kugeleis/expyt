@@ -85,11 +85,11 @@ export function initEventListeners() {
                 const flatTabContent = document.getElementById('flat-tab-content');
                 if (flatTabContent) flatTabContent.classList.remove('hidden');
 
-                // Move Group Column select to Flat container
-                const groupColContainer = document.getElementById('group-col-container');
+                // Move Group Column Card to Flat container
+                const groupColCard = document.getElementById('group-column-card');
                 const flatGroupContainer = document.getElementById('flat-group-container');
-                if (groupColContainer && flatGroupContainer) {
-                    flatGroupContainer.appendChild(groupColContainer);
+                if (groupColCard && flatGroupContainer) {
+                    flatGroupContainer.appendChild(groupColCard);
                 }
 
                 if (els.enableHierarchy) els.enableHierarchy.checked = false;
@@ -386,11 +386,11 @@ export function initEventListeners() {
                 const flatTabContent = document.getElementById('flat-tab-content');
                 if (flatTabContent) flatTabContent.classList.remove('hidden');
 
-                // Move Group Column select to Flat container
-                const groupColContainer = document.getElementById('group-col-container');
+                // Move Group Column Card to Flat container
+                const groupColCard = document.getElementById('group-column-card');
                 const flatGroupContainer = document.getElementById('flat-group-container');
-                if (groupColContainer && flatGroupContainer) {
-                    flatGroupContainer.appendChild(groupColContainer);
+                if (groupColCard && flatGroupContainer) {
+                    flatGroupContainer.appendChild(groupColCard);
                 }
 
                 if (els.enableHierarchy) els.enableHierarchy.checked = false;
@@ -440,11 +440,11 @@ export function initEventListeners() {
             els.tabHierarchical.style.borderBottomColor = 'transparent';
             els.tabHierarchical.style.color = 'var(--pico-muted-color)';
 
-            // Move Group Column select to Flat container
-            const groupColContainer = document.getElementById('group-col-container');
+            // Move Group Column Card to Flat container
+            const groupColCard = document.getElementById('group-column-card');
             const flatGroupContainer = document.getElementById('flat-group-container');
-            if (groupColContainer && flatGroupContainer) {
-                flatGroupContainer.appendChild(groupColContainer);
+            if (groupColCard && flatGroupContainer) {
+                flatGroupContainer.appendChild(groupColCard);
             }
 
             // Toggle tab content visibility
@@ -475,11 +475,11 @@ export function initEventListeners() {
             els.tabFlat.style.borderBottomColor = 'transparent';
             els.tabFlat.style.color = 'var(--pico-muted-color)';
 
-            // Move Group Column select to Hierarchical container
-            const groupColContainer = document.getElementById('group-col-container');
+            // Move Group Column Card to Hierarchical container
+            const groupColCard = document.getElementById('group-column-card');
             const hierarchicalGroupContainer = document.getElementById('hierarchical-group-container');
-            if (groupColContainer && hierarchicalGroupContainer) {
-                hierarchicalGroupContainer.appendChild(groupColContainer);
+            if (groupColCard && hierarchicalGroupContainer) {
+                hierarchicalGroupContainer.appendChild(groupColCard);
             }
 
             // Toggle tab content visibility

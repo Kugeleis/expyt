@@ -107,13 +107,14 @@
                                     margin-bottom: 1rem;
                                     border-bottom: 1px solid var(--pico-border-color);
                                     display: flex;
-                                    gap: 1rem;
+                                    width: 100%;
                                 "
                             >
                                 <button
                                     id="tab-flat"
                                     class="tab-btn active"
                                     style="
+                                        flex: 1;
                                         background: none;
                                         border: none;
                                         border-bottom: 2px solid var(--pico-primary);
@@ -123,6 +124,7 @@
                                         border-radius: 0;
                                         margin-bottom: -1px;
                                         cursor: pointer;
+                                        text-align: center;
                                     "
                                 >
                                     Flat Experiment
@@ -131,6 +133,7 @@
                                     id="tab-hierarchical"
                                     class="tab-btn"
                                     style="
+                                        flex: 1;
                                         background: none;
                                         border: none;
                                         border-bottom: 2px solid transparent;
@@ -140,6 +143,7 @@
                                         border-radius: 0;
                                         margin-bottom: -1px;
                                         cursor: pointer;
+                                        text-align: center;
                                     "
                                 >
                                     Hierarchical Experiment
@@ -201,130 +205,171 @@
                             <!-- Flat tab content container -->
                             <div id="flat-tab-content">
                                 <div id="flat-group-container">
-                                    <!-- group-col-container starts here -->
-                                    <div id="group-col-container" style="margin-top: 1.5rem; margin-bottom: 1.5rem">
-                                        <label for="group-col-select">Group Column (Independent Variable)</label>
-                                        <select id="group-col-select"></select>
-                                    </div>
+                                    <!-- group-column-card starts here -->
+                                    <article id="group-column-card" style="padding: 1rem; margin-bottom: 0">
+                                        <div id="group-col-container" style="margin-bottom: 1rem">
+                                            <label
+                                                for="group-col-select"
+                                                style="font-weight: 600; color: var(--accent-blue)"
+                                                >Group Column (Independent Variable)</label
+                                            >
+                                            <select id="group-col-select"></select>
+                                        </div>
+                                        <div id="subgroups-section" class="hidden" style="margin-top: 0.75rem">
+                                            <div
+                                                class="value-columns-header"
+                                                style="
+                                                    display: flex;
+                                                    justify-content: space-between;
+                                                    align-items: center;
+                                                    margin-bottom: 0.5rem;
+                                                "
+                                            >
+                                                <label
+                                                    style="
+                                                        font-weight: 600;
+                                                        color: var(--accent-blue);
+                                                        margin: 0 !important;
+                                                    "
+                                                    >Subgroups to Include</label
+                                                >
+                                                <div class="value-columns-actions" style="font-size: 0.75rem">
+                                                    <button type="button" class="btn-link" id="btn-select-all-groups">
+                                                        All
+                                                    </button>
+                                                    <span class="divider">/</span>
+                                                    <button type="button" class="btn-link" id="btn-deselect-all-groups">
+                                                        None
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <input
+                                                type="search"
+                                                id="subgroups-search"
+                                                placeholder="Filter subgroups..."
+                                                style="margin-bottom: 0.75rem"
+                                            />
+                                            <div id="subgroups-list" class="value-columns-list"></div>
+                                        </div>
+                                    </article>
                                 </div>
                             </div>
 
                             <!-- Hierarchical tab content container -->
                             <div id="hierarchy-config-section" class="hidden">
-                                <div id="hierarchical-group-container">
-                                    <!-- group-col-container will move here when Hierarchical is active -->
-                                </div>
-                                <div
-                                    id="hierarchy-fields"
-                                    style="
-                                        border: 1px dashed var(--pico-border-color);
-                                        padding: 1rem;
-                                        border-radius: 8px;
-                                        margin-bottom: 1.5rem;
-                                        background: rgba(255, 255, 255, 0.01);
-                                    "
-                                >
-                                    <h4
-                                        style="
-                                            font-size: 0.9rem;
-                                            margin-top: 0;
-                                            margin-bottom: 0.75rem;
-                                            color: var(--pico-primary);
-                                            font-weight: 600;
-                                        "
-                                    >
-                                        Hierarchical Structure Mapping
-                                    </h4>
-
-                                    <div class="auto-grid" style="--grid-min: 200px; --grid-gap: 1rem">
-                                        <div>
-                                            <label for="cluster-col-select"
-                                                >Cluster Column (Level 1 - e.g. school, batch)</label
-                                            >
-                                            <select id="cluster-col-select"></select>
-                                        </div>
-                                        <div>
-                                            <label for="unit-col-select"
-                                                >Unit Column (Level 0 - e.g. student, id)</label
-                                            >
-                                            <select id="unit-col-select"></select>
-                                        </div>
+                                <div class="auto-grid" style="--grid-min: 300px; --grid-gap: 1.25rem">
+                                    <div id="hierarchical-group-container">
+                                        <!-- group-column-card will move here when Hierarchical is active -->
                                     </div>
-                                    <div
-                                        class="auto-grid"
-                                        style="--grid-min: 200px; --grid-gap: 1rem; margin-top: 0.75rem"
-                                    >
-                                        <div>
-                                            <label for="x-col-select">X Spatial Coordinate (Optional)</label>
-                                            <select id="x-col-select">
-                                                <option value="">None</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label for="y-col-select">Y Spatial Coordinate (Optional)</label>
-                                            <select id="y-col-select">
-                                                <option value="">None</option>
-                                            </select>
-                                        </div>
+                                    <div id="hierarchical-cluster-container">
+                                        <article id="cluster-column-card" style="padding: 1rem; margin-bottom: 0">
+                                            <div style="margin-bottom: 1rem">
+                                                <label
+                                                    for="cluster-col-select"
+                                                    style="font-weight: 600; color: var(--accent-blue)"
+                                                    >Cluster Column (Level 1)</label
+                                                >
+                                                <select id="cluster-col-select"></select>
+                                            </div>
+                                            <div id="clusters-section" class="hidden" style="margin-top: 0.75rem">
+                                                <div
+                                                    class="value-columns-header"
+                                                    style="
+                                                        display: flex;
+                                                        justify-content: space-between;
+                                                        align-items: center;
+                                                        margin-bottom: 0.5rem;
+                                                    "
+                                                >
+                                                    <label
+                                                        style="
+                                                            font-weight: 600;
+                                                            color: var(--accent-blue);
+                                                            margin: 0 !important;
+                                                        "
+                                                        >Clusters to Include</label
+                                                    >
+                                                    <div class="value-columns-actions" style="font-size: 0.75rem">
+                                                        <button
+                                                            type="button"
+                                                            class="btn-link"
+                                                            id="btn-select-all-clusters"
+                                                        >
+                                                            All
+                                                        </button>
+                                                        <span class="divider">/</span>
+                                                        <button
+                                                            type="button"
+                                                            class="btn-link"
+                                                            id="btn-deselect-all-clusters"
+                                                        >
+                                                            None
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="search"
+                                                    id="clusters-search"
+                                                    placeholder="Filter clusters..."
+                                                    style="margin-bottom: 0.75rem"
+                                                />
+                                                <div id="clusters-list" class="value-columns-list"></div>
+                                            </div>
+                                        </article>
+                                    </div>
+                                    <div id="hierarchical-spatial-container">
+                                        <article id="spatial-config-card" style="padding: 1rem; margin-bottom: 0">
+                                            <header
+                                                style="margin-bottom: 0.5rem; font-weight: bold; font-size: 0.95rem"
+                                            >
+                                                Unit &amp; Spatial Coordinates (Optional)
+                                            </header>
+                                            <div style="margin-bottom: 0.75rem">
+                                                <label for="unit-col-select"
+                                                    >Unit Column (Level 0 - e.g. student, id)</label
+                                                >
+                                                <select id="unit-col-select"></select>
+                                            </div>
+                                            <div class="auto-grid" style="--grid-min: 120px; --grid-gap: 0.75rem">
+                                                <div>
+                                                    <label for="x-col-select">X Spatial Coordinate</label>
+                                                    <select id="x-col-select">
+                                                        <option value="">None</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="y-col-select">Y Spatial Coordinate</label>
+                                                    <select id="y-col-select">
+                                                        <option value="">None</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </article>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="auto-grid" style="--grid-min: 250px; --grid-gap: 1.25rem">
-                                <div id="clusters-section" class="hidden">
-                                    <div class="value-columns-header">
-                                        <label>Clusters to Include (Selected Cluster Column Values)</label>
-                                        <div class="value-columns-actions">
-                                            <button type="button" class="btn-link" id="btn-select-all-clusters">
-                                                Select All
-                                            </button>
-                                            <span class="divider">/</span>
-                                            <button type="button" class="btn-link" id="btn-deselect-all-clusters">
-                                                Deselect All
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <input
-                                        type="search"
-                                        id="clusters-search"
-                                        placeholder="Filter clusters..."
-                                        style="margin-bottom: 0.75rem"
-                                    />
-                                    <div id="clusters-list" class="value-columns-list"></div>
-                                </div>
-
-                                <div id="subgroups-section" class="hidden">
-                                    <div class="value-columns-header">
-                                        <label>Subgroups to Include (Selected Group Column Values)</label>
-                                        <div class="value-columns-actions">
-                                            <button type="button" class="btn-link" id="btn-select-all-groups">
-                                                Select All
-                                            </button>
-                                            <span class="divider">/</span>
-                                            <button type="button" class="btn-link" id="btn-deselect-all-groups">
-                                                Deselect All
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <input
-                                        type="search"
-                                        id="subgroups-search"
-                                        placeholder="Filter subgroups..."
-                                        style="margin-bottom: 0.75rem"
-                                    />
-                                    <div id="subgroups-list" class="value-columns-list"></div>
-                                </div>
-
-                                <div>
-                                    <div class="value-columns-header">
-                                        <label>Continuous Dependent Columns (Numeric)</label>
-                                        <div class="value-columns-actions">
-                                            <button type="button" class="btn-link" id="btn-select-all-cols">
-                                                Select All
-                                            </button>
+                            <!-- Bottom Grid: Dependent Columns -->
+                            <div class="auto-grid" style="--grid-min: 300px; --grid-gap: 1.25rem; margin-top: 1.5rem">
+                                <!-- Continuous Dependent Columns Card -->
+                                <article class="config-card" style="padding: 1rem; margin-bottom: 0">
+                                    <div
+                                        class="value-columns-header"
+                                        style="
+                                            display: flex;
+                                            justify-content: space-between;
+                                            align-items: center;
+                                            margin-bottom: 0.5rem;
+                                        "
+                                    >
+                                        <label style="font-weight: 600; margin: 0 !important"
+                                            >Continuous Dependent Columns (Numeric)</label
+                                        >
+                                        <div class="value-columns-actions" style="font-size: 0.75rem">
+                                            <button type="button" class="btn-link" id="btn-select-all-cols">All</button>
                                             <span class="divider">/</span>
                                             <button type="button" class="btn-link" id="btn-deselect-all-cols">
-                                                Deselect All
+                                                None
                                             </button>
                                         </div>
                                     </div>
@@ -335,18 +380,29 @@
                                         style="margin-bottom: 0.75rem"
                                     />
                                     <div id="value-columns-list" class="value-columns-list"></div>
-                                </div>
+                                </article>
 
-                                <div>
-                                    <div class="value-columns-header">
-                                        <label>Discrete Dependent Columns (Categorical)</label>
-                                        <div class="value-columns-actions">
+                                <!-- Discrete Dependent Columns Card -->
+                                <article class="config-card" style="padding: 1rem; margin-bottom: 0">
+                                    <div
+                                        class="value-columns-header"
+                                        style="
+                                            display: flex;
+                                            justify-content: space-between;
+                                            align-items: center;
+                                            margin-bottom: 0.5rem;
+                                        "
+                                    >
+                                        <label style="font-weight: 600; margin: 0 !important"
+                                            >Discrete Dependent Columns (Categorical)</label
+                                        >
+                                        <div class="value-columns-actions" style="font-size: 0.75rem">
                                             <button type="button" class="btn-link" id="btn-select-all-discrete">
-                                                Select All
+                                                All
                                             </button>
                                             <span class="divider">/</span>
                                             <button type="button" class="btn-link" id="btn-deselect-all-discrete">
-                                                Deselect All
+                                                None
                                             </button>
                                         </div>
                                     </div>
@@ -357,7 +413,7 @@
                                         style="margin-bottom: 0.75rem"
                                     />
                                     <div id="discrete-columns-list" class="value-columns-list"></div>
-                                </div>
+                                </article>
                             </div>
                         </div>
                     </section>
