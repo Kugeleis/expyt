@@ -8,11 +8,28 @@ import time
 from collections.abc import Generator
 
 import pandas as pd
+import playwright.sync_api
 import pytest
 import uvicorn
 from playwright.sync_api import Dialog, Page, expect
 
 from app.main import app
+
+
+def _check_playwright_launch() -> bool:
+    try:
+        with playwright.sync_api.sync_playwright() as p:
+            browser = p.chromium.launch()
+            browser.close()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _check_playwright_launch(),
+    reason="Playwright chromium browser cannot be launched (missing system dependencies)",
+)
 
 
 def get_free_port() -> int:
