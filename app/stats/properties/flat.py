@@ -154,8 +154,11 @@ def compute_data_properties(
     else:
         sample_size_warning = None
 
+    is_numeric = bool(pd.api.types.is_numeric_dtype(df[outcome_col]))
+
     return DataProperties(
         outcome_type_guess=outcome_type,
+        is_numeric=is_numeric,
         n_groups=n_groups,
         group_sizes=group_sizes,
         normality=normality,

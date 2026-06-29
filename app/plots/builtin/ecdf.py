@@ -39,8 +39,10 @@ class EcdfPlot(PlotGenerator):
     def is_applicable(self, properties: DataProperties) -> bool:
         """Determine whether the ECDF plot is applicable.
 
-        Requires at least 1 group, and all groups with size >= 1.
+        Requires at least 1 group, all groups with size >= 1, and continuous outcome.
         """
+        if not getattr(properties, "is_numeric", True):
+            return False
         n_groups = properties.n_groups
         group_sizes = properties.group_sizes
         if n_groups < 1:

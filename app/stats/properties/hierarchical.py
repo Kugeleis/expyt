@@ -276,8 +276,11 @@ def compute_hierarchical_properties(  # noqa: C901
         groups_str = ", ".join(small_groups)
         sample_size_warning = f"Warning: The following groups have small sample sizes (n < 5): {groups_str}."
 
+    is_numeric = bool(pd.api.types.is_numeric_dtype(df[metric]))
+
     return DataProperties(
         outcome_type_guess="continuous" if metric_kind == "continuous" else "categorical_nominal",
+        is_numeric=is_numeric,
         n_groups=n_groups,
         group_sizes=group_sizes,
         normality=normality_results,

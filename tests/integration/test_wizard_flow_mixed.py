@@ -231,3 +231,53 @@ def test_nycflights_origin_group(client: TestClient) -> None:
     assert res_data["group_column"] == "origin"
     assert set(res_data["selected_value_columns"]) == set(payload["selected_value_columns"])
     assert set(res_data["selected_discrete_columns"]) == set(payload["selected_discrete_columns"])
+
+
+def test_mixed_type_plot_generation(client: TestClient) -> None:
+    """Verify that generating plots for mixed continuous/discrete columns does not crash."""
+    with open("test_data/nycflights.csv", "rb") as f:
+        csv_content = f.read()
+
+    files = {"file": ("nycflights.csv", csv_content, "text/csv")}
+    resp = client.post("/wizard/upload", files=files)
+    assert resp.status_code == 200
+
+    resp = client.post("/wizard/sessions")
+    session_id = resp.json()["session_id"]
+
+    payload = {
+        "dataset_id": "nycflights",
+        "group_column": "origin",
+        "selected_value_columns": ["dep_delay"],
+        "selected_discrete_columns": ["carrier"],
+        "selected_groups": ["EWR", "LGA", "JFK"],
+    }
+    resp = client.post(f"/wizard/sessions/{session_id}/dataset", json=payload)
+    assert resp.status_code == 200
+
+    resp = client.post(f"/wizard/sessions/{session_id}/filters", json={"filters_config": []})
+    assert resp.status_code == 200
+
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/method",
+        json={"selected_method": "kruskal_wallis", "selected_discrete_method": "chi_square"},
+    )
+    assert resp.status_code == 200
+
+    resp = client.get(f"/wizard/sessions/{session_id}/results")
+    assert resp.status_code == 200
+    results = resp.json()
+    assert len(results) == 2
+
+    # Generate plots with boxplot (which is only applicable to continuous).
+    # It should skip 'carrier' (discrete) and generate for 'dep_delay' (continuous)
+    resp = client.post(
+        f"/wizard/sessions/{session_id}/plots",
+        json={"selected_plots": ["boxplot"]},
+    )
+    assert resp.status_code == 200
+    session_data = resp.json()
+    plot_results = session_data["plot_results"]
+    assert len(plot_results) == 1
+    assert plot_results[0]["plot_type"] == "boxplot"
+

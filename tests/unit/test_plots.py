@@ -74,6 +74,16 @@ def test_boxplot_applicability() -> None:
     )
     assert bp.is_applicable(props_empty_group) is False
 
+    # Inapplicable: Non-numeric outcome
+    props_non_numeric = DataProperties(
+        n_groups=2,
+        group_sizes={"A": 5, "B": 5},
+        normality={"A": 0.5, "B": 0.5},
+        variance_homogeneity=0.8,
+        is_numeric=False,
+    )
+    assert bp.is_applicable(props_non_numeric) is False
+
 
 def test_violin_applicability() -> None:
     """Test violinplot applicability logic."""
@@ -106,6 +116,16 @@ def test_violin_applicability() -> None:
     )
     assert vp.is_applicable(props_no_groups) is False
 
+    # Inapplicable: Non-numeric outcome
+    props_non_numeric = DataProperties(
+        n_groups=2,
+        group_sizes={"A": 3, "B": 4},
+        normality={"A": 0.5, "B": 0.5},
+        variance_homogeneity=0.8,
+        is_numeric=False,
+    )
+    assert vp.is_applicable(props_non_numeric) is False
+
 
 def test_ecdf_applicability() -> None:
     """Test ecdf applicability logic."""
@@ -128,6 +148,16 @@ def test_ecdf_applicability() -> None:
         variance_homogeneity=0.0,
     )
     assert ep.is_applicable(props_no_groups) is False
+
+    # Inapplicable: Non-numeric outcome
+    props_non_numeric = DataProperties(
+        n_groups=2,
+        group_sizes={"A": 1, "B": 1},
+        normality={"A": 0.0, "B": 0.0},
+        variance_homogeneity=0.0,
+        is_numeric=False,
+    )
+    assert ep.is_applicable(props_non_numeric) is False
 
 
 def test_boxplot_generate(sample_df: pd.DataFrame) -> None:

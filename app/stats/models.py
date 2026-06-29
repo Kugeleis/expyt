@@ -75,6 +75,7 @@ class DataProperties(BaseModel):
         "continuous",
         description=("Guessed outcome type (continuous, categorical_nominal, categorical_ordinal_unclear)."),
     )
+    is_numeric: bool = Field(True, description="Whether the outcome column is numeric.")
     n_groups: int = Field(..., description="Number of distinct groups.")
     group_sizes: dict[str, int] = Field(..., description="Size of each group after removing NaNs.")
     normality: dict[str, NormalityResult] = Field(..., description="Normality test result for each group.")

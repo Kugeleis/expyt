@@ -519,13 +519,9 @@ class WizardService:
         for value_col in top_columns:
             props = compute_properties(session, filtered_df, value_col)
             applicable = plot_registry.get_applicable(props)
-
             for name in selected_plots:
                 if name not in applicable:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Plot {name!r} not applicable for column {value_col!r}",
-                    )
+                    continue
                 generator = plot_registry.get(name)
 
                 sig = inspect.signature(generator.generate)
