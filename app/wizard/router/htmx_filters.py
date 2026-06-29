@@ -66,11 +66,13 @@ def add_filter(
 
     params: dict[str, Any] = {}
     if filter_type == "numeric_range":
-        params["min_val"] = float(min_val) if min_val else None
-        params["max_val"] = float(max_val) if max_val else None
+        params["column"] = column
+        params["min"] = float(min_val) if min_val else None
+        params["max"] = float(max_val) if max_val else None
     elif filter_type == "category_filter":
+        params["column"] = column
         params["values"] = [v.strip() for v in values.split(",")] if values else []
-        params["exclude"] = bool(exclude)
+        params["mode"] = "exclude" if exclude else "include"
     elif filter_type == "cluster_exclusion":
         if not cluster_id or not reason:
             raise HTTPException(status_code=400, detail="Cluster ID and Reason are required")
