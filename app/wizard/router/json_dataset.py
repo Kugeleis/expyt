@@ -1,3 +1,7 @@
+"""JSON routers for Step 1: Dataset selection and configuration."""
+
+from __future__ import annotations
+
 import shutil
 from pathlib import Path
 
@@ -6,18 +10,18 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.core.session import HierarchyConfig, SessionStore, WizardSession
+from app.core.session import SessionStore, WizardSession
 from app.datasets.models import DatasetInfo
 from app.datasets.repository import DatasetRepository
-from app.datasets.utils import resolve_selected_discrete_columns, resolve_selected_value_columns
 from app.wizard.router.dependencies import (
     get_dataset_repository,
     get_session,
     get_session_store,
+    get_wizard_service,
     render_step,
 )
 from app.wizard.schemas import DatasetSelectionRequest
-from app.wizard.steps import WizardStep, reset_to_step, validate_step_transition
+from app.wizard.service import WizardService
 
 router = APIRouter()
 
@@ -92,6 +96,7 @@ def upload_dataset_session_json(
     session: WizardSession = Depends(get_session),
     repo: DatasetRepository = Depends(get_dataset_repository),
     store: SessionStore = Depends(get_session_store),
+    service: WizardService = Depends(get_wizard_service),
 ) -> Response:
     """JSON compatibility and HTMX route: Upload dataset to specific session."""
     if not file.filename:
@@ -115,9 +120,7 @@ def upload_dataset_session_json(
         file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail="Unsupported file format") from None
 
-    reset_to_step(session, WizardStep.DATASET_SELECTION)
-    session.dataset_id = dataset_id
-    store.save(session)
+    session = service.select_dataset_id(session_id, dataset_id)
 
     if "hx-request" in request.headers:
         return render_step(request, session, store)
@@ -167,72 +170,28 @@ def get_column_unique_values(
 
 @router.post("/sessions/{session_id}/dataset", response_model=WizardSession)
 def select_dataset(
+    session_id: str,
     req: DatasetSelectionRequest,
-    session: WizardSession = Depends(get_session),
-    repo: DatasetRepository = Depends(get_dataset_repository),
-    store: SessionStore = Depends(get_session_store),
+    service: WizardService = Depends(get_wizard_service),
 ) -> WizardSession:
     """JSON compatibility route: Select a dataset and map columns."""
-    validate_step_transition(session, WizardStep.DATASET_SELECTION)
-
-    try:
-        schema = repo.get_schema(req.dataset_id)
-        df = repo.load_dataset(req.dataset_id)
-    except KeyError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Dataset {req.dataset_id!r} not found",
-        ) from None
-
-    group_col_info = next((col for col in schema.columns or [] if col.name == req.group_column), None)
-    if not group_col_info:
-        raise HTTPException(status_code=400, detail=f"Group column {req.group_column!r} not found")
-    if group_col_info.is_numeric:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Group column {req.group_column!r} must be discrete/categorical, but it is numeric.",
-        )
-
-    is_empty_val = not req.selected_value_columns
-    is_empty_disc = not req.selected_discrete_columns
-
-    try:
-        if is_empty_val and is_empty_disc:
-            session.selected_value_columns = resolve_selected_value_columns(df, req.group_column, [])
-            session.selected_discrete_columns = resolve_selected_discrete_columns(df, req.group_column, [])
-        else:
-            session.selected_value_columns = (
-                resolve_selected_value_columns(df, req.group_column, req.selected_value_columns)
-                if not is_empty_val
-                else []
-            )
-            session.selected_discrete_columns = (
-                resolve_selected_discrete_columns(df, req.group_column, req.selected_discrete_columns)
-                if not is_empty_disc
-                else []
-            )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
-
-    if not session.selected_value_columns and not session.selected_discrete_columns:
-        raise HTTPException(status_code=400, detail="Select at least one dependent column to analyze.")
-
-    session.dataset_id = req.dataset_id
-    session.group_column = req.group_column
-    session.selected_groups = req.selected_groups
-    session.hierarchy = None
-    session.excluded_clusters = []
-    session.current_step = WizardStep.FILTERS.value
-    store.save(session)
-    return session
+    service.select_dataset_id(session_id, req.dataset_id)
+    return service.submit_dataset_config(
+        session_id=session_id,
+        group_column=req.group_column,
+        selected_groups=req.selected_groups,
+        selected_value_columns=req.selected_value_columns,
+        selected_discrete_columns=req.selected_discrete_columns,
+    )
 
 
 @router.post("/sessions/{session_id}/hierarchy", response_model=HierarchyResponse)
-def set_hierarchy(  # noqa: C901
+def set_hierarchy(
+    session_id: str,
     req: HierarchyRequest,
     session: WizardSession = Depends(get_session),
     repo: DatasetRepository = Depends(get_dataset_repository),
-    store: SessionStore = Depends(get_session_store),
+    service: WizardService = Depends(get_wizard_service),
 ) -> HierarchyResponse:
     """JSON compatibility route: Configure hierarchical settings."""
     if session.dataset_id is None:
@@ -243,38 +202,13 @@ def set_hierarchy(  # noqa: C901
     except KeyError:
         raise HTTPException(status_code=400, detail="Dataset missing") from None
 
-    required_cols = [req.group_col, req.cluster_col]
-    if req.unit_col:
-        required_cols.append(req.unit_col)
-    for col in required_cols:
-        if col not in df.columns:
-            raise HTTPException(status_code=400, detail=f"Column {col!r} not found in dataset")
-
-    if req.cluster_col == req.group_col:
-        raise HTTPException(
-            status_code=400,
-            detail="Cluster column must not be the same as the group column.",
-        )
-
-    if pd.api.types.is_numeric_dtype(df[req.group_col]):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Group column {req.group_col!r} must be discrete/categorical, but it is numeric.",
-        )
-
-    if pd.api.types.is_numeric_dtype(df[req.cluster_col]):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cluster column {req.cluster_col!r} must be discrete/categorical, but it is numeric.",
-        )
-
-    if req.x_col and req.x_col not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Column {req.x_col!r} not found in dataset")
-    if req.y_col and req.y_col not in df.columns:
-        raise HTTPException(status_code=400, detail=f"Column {req.y_col!r} not found in dataset")
-
-    session.hierarchy = HierarchyConfig(
-        group_col=req.group_col,
+    service.toggle_hierarchy(session_id, enabled=True)
+    updated_session = service.submit_dataset_config(
+        session_id=session_id,
+        group_column=req.group_col,
+        selected_groups=session.selected_groups,
+        selected_value_columns=session.selected_value_columns,
+        selected_discrete_columns=session.selected_discrete_columns,
         cluster_col=req.cluster_col,
         selected_clusters=req.selected_clusters,
         unit_col=req.unit_col,
@@ -290,26 +224,6 @@ def set_hierarchy(  # noqa: C901
     if req.y_col:
         ignored_cols.add(req.y_col)
 
-    new_value_cols = []
-    for col in session.selected_value_columns:
-        if col in ignored_cols:
-            continue
-        if col in df.columns and (pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col])):
-            new_value_cols.append(col)
-    session.selected_value_columns = new_value_cols
-
-    new_discrete_cols = []
-    for col in session.selected_discrete_columns:
-        if col in ignored_cols:
-            continue
-        if col in df.columns and (pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_bool_dtype(df[col])):
-            unique_vals = set(df[col].dropna().unique())
-            if unique_vals.issubset({0, 1}):
-                new_discrete_cols.append(col)
-    session.selected_discrete_columns = new_discrete_cols
-
-    store.save(session)
-
     metric_kinds = {}
     for col in df.columns:
         if col in ignored_cols:
@@ -323,4 +237,4 @@ def set_hierarchy(  # noqa: C901
         else:
             metric_kinds[col] = "unsupported"
 
-    return HierarchyResponse(session=session, metric_kinds=metric_kinds)
+    return HierarchyResponse(session=updated_session, metric_kinds=metric_kinds)
